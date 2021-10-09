@@ -35,7 +35,7 @@ solution ( "ape" )
   project ( "ape" )
   kind ( "StaticLib" )
   language ( "C" )
-  files { "./src/*.h", "./src/*.c" }
+  files { "./include/*.h", "./src/*.h", "./src/*.c" }
   excludes { "./src/main.c" }
   includedirs { "./include" }
   defines { "_UNICODE" }
