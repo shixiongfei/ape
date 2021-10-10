@@ -10,7 +10,9 @@
  */
 
 #include "ape.h"
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 enum {
   P_DEF,
@@ -62,11 +64,32 @@ struct ape_Object {
   Value car, cdr;
 };
 
+#define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
+#define GCMARKBIT (0x2)
+#define GCSTACKSIZE (256)
+#define CHUNKSIZE (256)
+
+typedef struct ape_Chunk {
+  ape_Object objects[CHUNKSIZE];
+  struct ape_Chunk *next;
+} ape_Chunk;
+
 struct ape_State {
   ape_Alloc alloc;
   void *ud;
 
   ape_Handlers handlers;
+
+  ape_Chunk *chunks;
+  int chunks_count;
+
+  ape_Object *gcstack[GCSTACKSIZE];
+  int gcstack_idx;
+
+  ape_Object *calllist;
+  ape_Object *freelist;
+  ape_Object *symlist;
+  ape_Object *t;
 };
 
 #define unused(x) ((void)x)
@@ -99,10 +122,6 @@ struct ape_State {
 #define cfunc(x) ((x)->cdr.f)
 #define strbuf(x) (&(x)->car.c + 1)
 
-#define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
-#define GCMARKBIT (0x2)
-#define GCSTACKSIZE (256)
-
 static ape_Object nil = {{(void *)(APE_TNIL << 2 | 1)}, {NULL}};
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
@@ -119,6 +138,27 @@ static void *alloc_emul(void *ud, void *ptr, size_t size) {
 #define ape_malloc(A, n) ape_realloc(A, NULL, n)
 #define ape_free(A, p) ape_realloc(A, p, 0)
 
+static void extend_chunks(ape_State *A) {
+  ape_Chunk *chunk = (ape_Chunk *)ape_malloc(A, sizeof(ape_Chunk));
+  int i;
+
+  if (!chunk)
+    ape_error(A, "out of memory");
+
+  /* push to the chunks list */
+  chunk->next = A->chunks;
+  A->chunks = chunk;
+  A->chunks_count += 1;
+
+  /* populate freelist */
+  for (i = 0; i < CHUNKSIZE; ++i) {
+    ape_Object *obj = &chunk->objects[i];
+    settype(obj, APE_TFREE);
+    cdr(obj) = A->freelist;
+    A->freelist = obj;
+  }
+}
+
 ape_State *ape_newstate(ape_Alloc f, void *ud) {
   ape_Alloc alloc = f ? f : alloc_emul;
   ape_State *A = (ape_State *)alloc(ud, NULL, sizeof(ape_State));
@@ -126,12 +166,45 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
   if (!A)
     return NULL;
 
+  memset(A, 0, sizeof(ape_State));
+
   A->alloc = alloc;
   A->ud = ud;
+
+  A->calllist = &nil;
+  A->freelist = &nil;
+  A->symlist = &nil;
 
   return A;
 }
 
-void ape_close(ape_State *A) { ape_free(A, A); }
+void ape_close(ape_State *A) {
+  ape_Chunk *chunk = A->chunks;
+
+  /* free all chunks */
+  while (chunk) {
+    ape_Chunk *next = chunk->next;
+    ape_free(A, chunk);
+    chunk = next;
+  }
+
+  ape_free(A, A);
+}
 
 ape_Handlers *ape_handlers(ape_State *A) { return &A->handlers; }
+
+void ape_error(ape_State *A, const char *errmsg) {
+  ape_Object *cl = A->calllist;
+
+  /* reset context state */
+  A->calllist = &nil;
+
+  /* do error handler */
+  if (A->handlers.error)
+    A->handlers.error(A, errmsg, cl);
+
+  /* error handler returned -- print error and traceback, exit */
+  fprintf(stderr, "error: %s\n", errmsg);
+
+  exit(EXIT_FAILURE);
+}
