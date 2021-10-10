@@ -69,6 +69,17 @@ struct ape_Object {
 #define GCSTACKSIZE (256)
 #define CHUNKSIZE (256)
 
+/*                               Chunks
+ * +--------+--------+--------+           +--------+--------+--------+
+ * | Object | Object | Object |     +-----+ Object | Object | Object |
+ * +--------+--------+--------+     |     +--------+--------+--------+
+ * | Object | Object | Object |     |     | Object | Object | Object |
+ * +--------+--------+--------+     |     +--------+--------+--------+
+ * |        ...etc...         |     |     |        ...etc...         |
+ * +--------------------------+     |     +--------------------------+
+ * |        next chunk        +-----+     |    next chunk or NULL    |
+ * +--------------------------+           +--------------------------+
+ */
 typedef struct ape_Chunk {
   ape_Object objects[CHUNKSIZE];
   struct ape_Chunk *next;
