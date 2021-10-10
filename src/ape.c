@@ -80,6 +80,7 @@ struct ape_Object {
  * |        next chunk        +-----+     |    next chunk or NULL    |
  * +--------------------------+           +--------------------------+
  */
+
 typedef struct ape_Chunk {
   ape_Object objects[CHUNKSIZE];
   struct ape_Chunk *next;
@@ -149,12 +150,12 @@ static void *alloc_emul(void *ud, void *ptr, size_t size) {
 #define ape_malloc(A, n) ape_realloc(A, NULL, n)
 #define ape_free(A, p) ape_realloc(A, p, 0)
 
-static void extend_chunks(ape_State *A) {
+static int extend_chunks(ape_State *A) {
   ape_Chunk *chunk = (ape_Chunk *)ape_malloc(A, sizeof(ape_Chunk));
   int i;
 
   if (!chunk)
-    ape_error(A, "out of memory");
+    return -1;
 
   /* push to the chunks list */
   chunk->next = A->chunks;
@@ -168,6 +169,61 @@ static void extend_chunks(ape_State *A) {
     cdr(obj) = A->freelist;
     A->freelist = obj;
   }
+  return 0;
+}
+
+static void collect_garbage(ape_State *A) {
+  ape_Chunk *chunk;
+  int i;
+
+  /* mark */
+  for (i = 0; i < A->gcstack_idx; i++) {
+    ape_mark(A, A->gcstack[i]);
+  }
+  ape_mark(A, A->symlist);
+
+  /* sweep and unmark */
+  for (chunk = A->chunks; chunk != NULL; chunk = chunk->next) {
+    for (i = 0; i < CHUNKSIZE; ++i) {
+      ape_Object *obj = &chunk->objects[i];
+
+      if (type(obj) == APE_TFREE)
+        continue;
+
+      /* marked */
+      if (tag(obj) & GCMARKBIT) {
+        tag(obj) &= ~GCMARKBIT;
+        continue;
+      }
+
+      if (type(obj) == APE_TPTR && A->handlers.gc)
+        A->handlers.gc(A, obj);
+
+      settype(obj, APE_TFREE);
+      cdr(obj) = A->freelist;
+      A->freelist = obj;
+    }
+  }
+}
+
+static ape_Object *alloc(ape_State *A) {
+  ape_Object *obj;
+
+  /* do gc if freelist has no more objects */
+  if (isnil(A->freelist)) {
+    collect_garbage(A);
+
+    if (isnil(A->freelist))
+      if (extend_chunks(A) < 0)
+        ape_error(A, "out of memory");
+  }
+
+  /* get object from freelist and push to the gcstack */
+  obj = A->freelist;
+  A->freelist = cdr(obj);
+  ape_pushgc(A, obj);
+
+  return obj;
 }
 
 ape_State *ape_newstate(ape_Alloc f, void *ud) {
@@ -218,4 +274,44 @@ void ape_error(ape_State *A, const char *errmsg) {
   fprintf(stderr, "error: %s\n", errmsg);
 
   exit(EXIT_FAILURE);
+}
+
+void ape_pushgc(ape_State *A, ape_Object *obj) {
+  if (A->gcstack_idx == GCSTACKSIZE)
+    ape_error(A, "gc stack overflow");
+
+  A->gcstack[A->gcstack_idx++] = obj;
+}
+
+void ape_restoregc(ape_State *A, int idx) { A->gcstack_idx = idx; }
+
+int ape_savegc(ape_State *A) { return A->gcstack_idx; }
+
+void ape_mark(ape_State *A, ape_Object *obj) {
+  ape_Object *car;
+
+loop:
+  if (tag(obj) & GCMARKBIT)
+    return;
+
+  /* store car before modifying it with GCMARKBIT */
+  car = car(obj);
+  tag(obj) |= GCMARKBIT;
+
+  switch (type(obj)) {
+  case APE_TPAIR:
+    ape_mark(A, car);
+    /* fall through */
+  case APE_TFUNC:
+  case APE_TMACRO:
+  case APE_TSYMBOL:
+  case APE_TSTRING:
+    obj = cdr(obj);
+    goto loop;
+
+  case APE_TPTR:
+    if (A->handlers.mark)
+      A->handlers.mark(A, obj);
+    break;
+  }
 }

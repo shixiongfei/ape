@@ -75,6 +75,11 @@ APE_API void ape_close(ape_State *A);
 APE_API ape_Handlers *ape_handlers(ape_State *A);
 APE_API void ape_error(ape_State *A, const char *errmsg);
 
+APE_API void ape_pushgc(ape_State *A, ape_Object *obj);
+APE_API void ape_restoregc(ape_State *A, int idx);
+APE_API int ape_savegc(ape_State *A);
+APE_API void ape_mark(ape_State *A, ape_Object *obj);
+
 #ifdef __cplusplus
 };
 #endif
