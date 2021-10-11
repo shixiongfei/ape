@@ -52,19 +52,29 @@ static const char *typenames[] = {
     "pair",   "free",     "nil",   "integer",   "number",    "symbol",
     "string", "function", "macro", "primitive", "cfunction", "pointer"};
 
+#define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
+
 typedef union {
   ape_Object *o;
   ape_CFunc f;
   ape_Integer d;
   ape_Number n;
-  char c;
+  struct {
+    char c;
+    char s[STRBUFSIZE];
+  };
 } Value;
+
+/*               Object
+ * +---------------+---------------+
+ * |      car      |      cdr      |
+ * +---------------+---------------+
+ */
 
 struct ape_Object {
   Value car, cdr;
 };
 
-#define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define GCMARKBIT (0x2)
 #define GCSTACKSIZE (256)
 #define CHUNKSIZE (256)
@@ -105,12 +115,6 @@ struct ape_State {
 };
 
 #define unused(x) ((void)x)
-
-/*                Pair
- * +---------------+---------------+
- * |      car      |      cdr      |
- * +---------------+---------------+
- */
 
 #define car(x) ((x)->car.o)
 #define cdr(x) ((x)->cdr.o)

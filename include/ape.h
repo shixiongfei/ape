@@ -32,12 +32,20 @@
 
 #define APE_API extern
 
+/* assumption: pointers are 32 or 64 bit,
+   and float/double are IEEE binary32/binary64 */
+#if UINTPTR_MAX > (1ULL << 32)
+typedef double floatptr_t;
+#else
+typedef float floatptr_t;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef int64_t ape_Integer;
-typedef double ape_Number;
+typedef intptr_t ape_Integer;
+typedef floatptr_t ape_Number;
 typedef struct ape_Object ape_Object;
 typedef struct ape_State ape_State;
 typedef ape_Object *(*ape_CFunc)(ape_State *A, ape_Object *args);
