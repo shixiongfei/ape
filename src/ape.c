@@ -102,6 +102,20 @@ typedef struct ape_Chunk {
   struct ape_Chunk *next;
 } ape_Chunk;
 
+/*                   Symbol List
+ * +--------+--------+        +--------+--------+
+ * |  car   |   cdr  +--------+  car   |   nil  |
+ * +---+----+--------+        +---+----+--------+
+ *     |                          |
+ * +---+----+--------+        +---+----+--------+
+ * | Symbol |        |        | Symbol |        |
+ * +--------+---+----+        +--------+---+----+
+ *              |                          |
+ *          +---+----+--------+        +---+----+--------+
+ *          | String |  ...   |        | String |  ...   |
+ *          +--------+--------+        +--------+--------+
+ */
+
 struct ape_State {
   ape_Alloc alloc;
   void *ud;
@@ -454,7 +468,45 @@ ape_Object *ape_lstring(ape_State *A, const char *str, int len) {
   return obj;
 }
 
-ape_Object *ape_symbol(ape_State *A, const char *name) {}
+static int strleq(ape_Object *obj, const char *str, int len) {
+  int i, j = 0;
+
+  while (!isnil(obj) && j < len) {
+    int size = tag(obj) & FCMARKBIT ? STRBUFSIZE : stridx(obj);
+
+    for (i = 0; i < size && j < len; ++i)
+      if (strbuf(obj)[i] != str[j++])
+        return 0;
+
+    if (i != size)
+      return 0;
+
+    obj = cdr(obj);
+  }
+
+  return isnil(obj) && j == len;
+}
+
+static int streq(ape_Object *obj, const char *str) {
+  return strleq(obj, str, strlen(str));
+}
+
+ape_Object *ape_symbol(ape_State *A, const char *name) {
+  ape_Object *obj;
+
+  /* try to find in symlist */
+  for (obj = A->symlist; !isnil(obj); obj = cdr(obj))
+    if (streq(cdr(car(obj)), name))
+      return car(obj);
+
+  /* create new object, push to symlist and return */
+  obj = alloc(A);
+  settype(obj, APE_TSYMBOL);
+  cdr(obj) = ape_string(A, name);
+  A->symlist = ape_cons(A, obj, A->symlist);
+
+  return obj;
+}
 
 ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
   ape_Object *obj = alloc(A);
