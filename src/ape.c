@@ -53,6 +53,11 @@ static const char *typenames[] = {
     "string", "function", "macro", "primitive", "cfunction", "pointer"};
 
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
+#define STRBUFINDEX (STRBUFSIZE - 1)
+#define CHUNKSIZE (256)
+#define GCSTACKSIZE (256)
+#define GCMARKBIT (0x2)
+#define FCMARKBIT (0x4)
 
 typedef union {
   ape_Object *o;
@@ -60,8 +65,13 @@ typedef union {
   ape_Integer d;
   ape_Number n;
   struct {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    char s[STRBUFSIZE];
+    char c;
+#else
     char c;
     char s[STRBUFSIZE];
+#endif
   };
 } Value;
 
@@ -74,10 +84,6 @@ typedef union {
 struct ape_Object {
   Value car, cdr;
 };
-
-#define GCMARKBIT (0x2)
-#define GCSTACKSIZE (256)
-#define CHUNKSIZE (256)
 
 /*                               Chunks
  * +--------+--------+--------+           +--------+--------+--------+
@@ -121,14 +127,14 @@ struct ape_State {
 
 /*                Tag
  * +---+---+---+---+---+---+---+---+
- * |          Type         |GC | 1 |
+ * |        Type       |FC |GC | 1 |
  * +---+---+---+---+---+---+---+---+
  * 8   7   6   5   4   3   2   1   0
  */
 
 #define tag(x) ((x)->car.c)
-#define type(x) (tag(x) & 0x1 ? tag(x) >> 2 : APE_TPAIR)
-#define settype(x, t) (tag(x) = (t) << 2 | 1)
+#define type(x) (tag(x) & 0x1 ? tag(x) >> 3 : APE_TPAIR)
+#define settype(x, t) (tag(x) = (t) << 3 | 1)
 
 #define isnil(x) ((x) == &nil)
 
@@ -136,9 +142,32 @@ struct ape_State {
 #define number(x) ((x)->cdr.n)
 #define prim(x) ((x)->cdr.c)
 #define cfunc(x) ((x)->cdr.f)
-#define strbuf(x) (&(x)->car.c + 1)
 
-static ape_Object nil = {{(void *)(APE_TNIL << 2 | 1)}, {NULL}};
+/* String: Hello, World.
+ *                             car                                     cdr
+ * +-------------------------------------------------------------+-------------+
+ * |           tag                         strbuf                |             |
+ * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |             |
+ * | | String | 1 | 0 | 1 | | \H | \e | \l | \l | \o | \, | \  | |      +      |
+ * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |      |      |
+ * |            c             s0   s1   s2   s3   s4   s5   s6   |      |      |
+ * +-------------------------------------------------------------+------+------+
+ *                                                                      |
+ *                              +---------------------------------------+
+ *                              |
+ * +----------------------------+--------------------------------+-------------+
+ * |           tag                         strbuf                |             |
+ * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |             |
+ * | | String | 0 | 0 | 1 | | \W | \o | \r | \l | \d | \. |  6 | |     nil     |
+ * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |             |
+ * |            c             s0   s1   s2   s3   s4   s5   s6   |             |
+ * +-------------------------------------------------------------+-------------+
+ */
+
+#define strbuf(x) ((x)->car.s)
+#define stridx(x) ((x)->car.s[STRBUFINDEX])
+
+static ape_Object nil = {{(void *)(APE_TNIL << 3 | 1)}, {NULL}};
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
   unused(ud);
@@ -318,4 +347,124 @@ loop:
       A->handlers.mark(A, obj);
     break;
   }
+}
+
+int ape_type(ape_State *A, ape_Object *obj) {
+  unused(A);
+  return type(obj);
+}
+
+int ape_isnil(ape_State *A, ape_Object *obj) {
+  unused(A);
+  return isnil(obj);
+}
+
+static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
+  if (type(obj) != type) {
+    char buf[64];
+    sprintf(buf, "expected %s, got %s", typenames[type], typenames[type(obj)]);
+    ape_error(A, buf);
+  }
+  return obj;
+}
+
+ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr) {
+  ape_Object *obj = alloc(A);
+  car(obj) = car;
+  cdr(obj) = cdr;
+  return obj;
+}
+
+ape_Object *ape_car(ape_State *A, ape_Object *obj) {
+  if (isnil(obj))
+    return obj;
+  return car(checktype(A, obj, APE_TPAIR));
+}
+
+ape_Object *ape_cdr(ape_State *A, ape_Object *obj) {
+  if (isnil(obj))
+    return obj;
+  return cdr(checktype(A, obj, APE_TPAIR));
+}
+
+ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt) {
+  ape_Object *list = &nil;
+
+  while (cnt--)
+    list = ape_cons(A, objs[cnt], list);
+
+  return list;
+}
+
+ape_Object *ape_bool(ape_State *A, int b) { return b ? A->t : &nil; }
+
+ape_Object *ape_integer(ape_State *A, ape_Integer d) {
+  ape_Object *obj = alloc(A);
+  settype(obj, APE_TINTEGER);
+  integer(obj) = d;
+  return obj;
+}
+
+ape_Object *ape_number(ape_State *A, ape_Number n) {
+  ape_Object *obj = alloc(A);
+  settype(obj, APE_TNUMBER);
+  number(obj) = n;
+  return obj;
+}
+
+static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
+  int index;
+
+  if (!tail || (tag(tail) & FCMARKBIT)) {
+    ape_Object *obj = ape_cons(A, NULL, &nil);
+    settype(obj, APE_TSTRING);
+
+    if (tail) {
+      cdr(tail) = obj;
+      A->gcstack_idx--;
+    }
+
+    tail = obj;
+  }
+
+  index = stridx(tail);
+  strbuf(tail)[index++] = ch;
+
+  if (index == STRBUFSIZE)
+    tag(tail) |= FCMARKBIT;
+  else
+    stridx(tail) = index;
+
+  return tail;
+}
+
+ape_Object *ape_string(ape_State *A, const char *str) {
+  return ape_lstring(A, str, strlen(str));
+}
+
+ape_Object *ape_lstring(ape_State *A, const char *str, int len) {
+  ape_Object *obj = build_string(A, NULL, 0);
+  ape_Object *tail = obj;
+  int i;
+
+  for (i = 0; i < len; ++i)
+    tail = build_string(A, tail, str[i]);
+
+  return obj;
+}
+
+ape_Object *ape_symbol(ape_State *A, const char *name) {}
+
+ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
+  ape_Object *obj = alloc(A);
+  settype(obj, APE_TCFUNC);
+  cfunc(obj) = fn;
+  return obj;
+}
+
+ape_Object *ape_ptr(ape_State *A, void *ptr) {
+  ape_Object *obj = alloc(A);
+  settype(obj, APE_TPTR);
+  cdr(obj) = ptr;
+  return obj;
 }

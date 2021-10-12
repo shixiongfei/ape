@@ -66,7 +66,7 @@ enum {
   APE_TPAIR,
   APE_TFREE,
   APE_TNIL,
-  APE_INTEGER,
+  APE_TINTEGER,
   APE_TNUMBER,
   APE_TSYMBOL,
   APE_TSTRING,
@@ -87,6 +87,22 @@ APE_API void ape_pushgc(ape_State *A, ape_Object *obj);
 APE_API void ape_restoregc(ape_State *A, int idx);
 APE_API int ape_savegc(ape_State *A);
 APE_API void ape_mark(ape_State *A, ape_Object *obj);
+
+APE_API int ape_type(ape_State *A, ape_Object *obj);
+APE_API int ape_isnil(ape_State *A, ape_Object *obj);
+
+APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
+APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
+APE_API ape_Object *ape_cdr(ape_State *A, ape_Object *obj);
+APE_API ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt);
+APE_API ape_Object *ape_bool(ape_State *A, int b);
+APE_API ape_Object *ape_integer(ape_State *A, ape_Integer d);
+APE_API ape_Object *ape_number(ape_State *A, ape_Number n);
+APE_API ape_Object *ape_string(ape_State *A, const char *str);
+APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
+APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
+APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
+APE_API ape_Object *ape_ptr(ape_State *A, void *ptr);
 
 #ifdef __cplusplus
 };
