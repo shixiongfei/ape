@@ -419,10 +419,11 @@ static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
     ape_Object *obj = ape_cons(A, NULL, &nil);
     settype(obj, APE_TSTRING);
 
-    if (tail) {
-      cdr(tail) = obj;
-      A->gcstack_idx--;
-    }
+    if (!tail)
+      return obj;
+
+    cdr(tail) = obj;
+    A->gcstack_idx--;
 
     tail = obj;
   }
