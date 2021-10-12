@@ -81,7 +81,7 @@ APE_API ape_State *ape_newstate(ape_Alloc f, void *ud);
 APE_API void ape_close(ape_State *A);
 
 APE_API ape_Handlers *ape_handlers(ape_State *A);
-APE_API void ape_error(ape_State *A, const char *errmsg);
+APE_API int ape_error(ape_State *A, const char *errmsg);
 
 APE_API void ape_pushgc(ape_State *A, ape_Object *obj);
 APE_API void ape_restoregc(ape_State *A, int idx);
@@ -90,6 +90,7 @@ APE_API void ape_mark(ape_State *A, ape_Object *obj);
 
 APE_API int ape_type(ape_State *A, ape_Object *obj);
 APE_API int ape_isnil(ape_State *A, ape_Object *obj);
+APE_API int ape_length(ape_State *A, ape_Object *obj);
 
 APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
 APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
@@ -103,6 +104,19 @@ APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
 APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
 APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
 APE_API ape_Object *ape_ptr(ape_State *A, void *ptr);
+
+APE_API ape_Integer ape_tointeger(ape_State *A, ape_Object *obj);
+APE_API ape_Number ape_tonumber(ape_State *A, ape_Object *obj);
+APE_API int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size);
+APE_API void *ape_toptr(ape_State *A, ape_Object *obj);
+
+APE_API ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata);
+APE_API void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn,
+                       void *udata, int strqt);
+
+APE_API void ape_set(ape_State *a, ape_Object *sym, ape_Object *val);
+APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
+APE_API ape_Object *ape_eval(ape_State *A, ape_Object *obj);
 
 #ifdef __cplusplus
 };

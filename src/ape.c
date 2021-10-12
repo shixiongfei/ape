@@ -29,6 +29,8 @@ enum {
   P_CONS,
   P_CAR,
   P_CDR,
+  P_LIST,
+  P_LENGTH,
   P_IS,
   P_PRINT,
   P_EQ,
@@ -44,9 +46,9 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def", "set!", "cond", "fn",  "macro", "quote", "and",   "or", "not",
-    "xor", "do",   "cons", "car", "cdr",   "is?",   "print", "=",  "<",
-    "<=",  ">",    ">=",   "+",   "-",     "*",     "/"};
+    "def", "set!", "cond", "fn",  "macro", "quote", "and",    "or",  "not",
+    "xor", "do",   "cons", "car", "cdr",   "list",  "length", "is?", "print",
+    "=",   "<",    "<=",   ">",   ">=",    "+",     "-",      "*",   "/"};
 
 static const char *typenames[] = {
     "pair",   "free",     "nil",   "integer",   "number",    "symbol",
@@ -180,6 +182,7 @@ struct ape_State {
 
 #define strbuf(x) ((x)->car.s)
 #define stridx(x) ((x)->car.s[STRBUFINDEX])
+#define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
 static ape_Object nil = {{(void *)(APE_TNIL << 3 | 1)}, {NULL}};
 
@@ -282,12 +285,21 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
 
   memset(A, 0, sizeof(ape_State));
 
+  /* init allocator */
   A->alloc = alloc;
   A->ud = ud;
 
+  /* init lists */
   A->calllist = &nil;
   A->freelist = &nil;
   A->symlist = &nil;
+
+  /* init objects */
+  A->t = ape_symbol(A, "true");
+  ape_set(A, A->t, A->t);
+
+  /* register built in primitives */
+  // TODO
 
   return A;
 }
@@ -307,7 +319,7 @@ void ape_close(ape_State *A) {
 
 ape_Handlers *ape_handlers(ape_State *A) { return &A->handlers; }
 
-void ape_error(ape_State *A, const char *errmsg) {
+int ape_error(ape_State *A, const char *errmsg) {
   ape_Object *cl = A->calllist;
 
   /* reset context state */
@@ -320,7 +332,14 @@ void ape_error(ape_State *A, const char *errmsg) {
   /* error handler returned -- print error and traceback, exit */
   fprintf(stderr, "error: %s\n", errmsg);
 
+  for (; !isnil(cl); cl = cdr(cl)) {
+    char buf[64];
+    ape_tostring(A, car(cl), buf, sizeof(buf));
+    fprintf(stderr, "=> %s\n", buf);
+  }
+
   exit(EXIT_FAILURE);
+  return -1;
 }
 
 void ape_pushgc(ape_State *A, ape_Object *obj) {
@@ -371,6 +390,24 @@ int ape_type(ape_State *A, ape_Object *obj) {
 int ape_isnil(ape_State *A, ape_Object *obj) {
   unused(A);
   return isnil(obj);
+}
+
+int ape_length(ape_State *A, ape_Object *obj) {
+  int len;
+
+  if (type(obj) == APE_TPAIR) {
+    for (len = 0; !isnil(obj); obj = cdr(obj))
+      len += 1;
+    return len;
+  }
+
+  if (type(obj) == APE_TSTRING) {
+    for (len = 0; !isnil(obj); obj = cdr(obj))
+      len += strcnt(obj);
+    return len;
+  }
+
+  return ape_error(A, "not an iteratable object");
 }
 
 static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
@@ -472,7 +509,7 @@ static int strleq(ape_Object *obj, const char *str, int len) {
   int i, j = 0;
 
   while (!isnil(obj) && j < len) {
-    int size = tag(obj) & FCMARKBIT ? STRBUFSIZE : stridx(obj);
+    int size = strcnt(obj);
 
     for (i = 0; i < size && j < len; ++i)
       if (strbuf(obj)[i] != str[j++])
@@ -521,3 +558,153 @@ ape_Object *ape_ptr(ape_State *A, void *ptr) {
   cdr(obj) = ptr;
   return obj;
 }
+
+ape_Integer ape_tointeger(ape_State *A, ape_Object *obj) {
+  return integer(checktype(A, obj, APE_TINTEGER));
+}
+
+ape_Number ape_tonumber(ape_State *A, ape_Object *obj) {
+  return number(checktype(A, obj, APE_TNUMBER));
+}
+
+typedef struct {
+  char *p;
+  int n;
+} CharPtrInt;
+
+static void writebuf(ape_State *A, void *udata, char ch) {
+  CharPtrInt *x = udata;
+
+  unused(A);
+
+  if (x->n) {
+    *x->p++ = ch;
+    x->n--;
+  }
+}
+
+int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size) {
+  CharPtrInt x;
+
+  x.p = dst;
+  x.n = size - 1;
+
+  ape_write(A, obj, writebuf, &x, 0);
+  *x.p = '\0';
+
+  return size - x.n - 1;
+}
+
+void *ape_toptr(ape_State *A, ape_Object *obj) {
+  return cdr(checktype(A, obj, APE_TPTR));
+}
+
+ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {}
+
+static void writestr(ape_State *A, ape_WriteFunc fn, void *udata,
+                     const char *str) {
+  while (*str)
+    fn(A, udata, *str++);
+}
+
+void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
+               int strqt) {
+  char buf[32];
+
+  switch (type(obj)) {
+  case APE_TNIL:
+    writestr(A, fn, udata, "nil");
+    break;
+
+  case APE_TINTEGER:
+#if UINTPTR_MAX > (1ULL << 32)
+#if _MSC_VER
+    sprintf(buf, "%I64d", integer(obj));
+#else
+    sprintf(buf, "%ld", integer(obj));
+#endif
+#else
+    sprintf(buf, "%d", integer(obj));
+#endif
+    writestr(A, fn, udata, buf);
+    break;
+
+  case APE_TNUMBER:
+#if UINTPTR_MAX > (1ULL << 32)
+    sprintf(buf, "%.14g", number(obj));
+#else
+    sprintf(buf, "%.7g", number(obj));
+#endif
+    writestr(A, fn, udata, buf);
+    break;
+
+  case APE_TSYMBOL:
+    ape_write(A, cdr(obj), fn, udata, 0);
+    break;
+
+  case APE_TPAIR:
+    fn(A, udata, '(');
+
+    for (;;) {
+      ape_write(A, car(obj), fn, udata, 1);
+      obj = cdr(obj);
+
+      if (type(obj) != APE_TPAIR)
+        break;
+
+      fn(A, udata, ' ');
+    }
+
+    if (!isnil(obj)) {
+      writestr(A, fn, udata, " . ");
+      ape_write(A, obj, fn, udata, 1);
+    }
+
+    fn(A, udata, ')');
+    break;
+
+  case APE_TSTRING:
+    if (strqt)
+      fn(A, udata, '"');
+
+    while (!isnil(obj)) {
+      int i, len = strcnt(obj);
+
+      for (i = 0; i < len; ++i) {
+        if (strqt && strbuf(obj)[i] == '"')
+          fn(A, udata, '\\');
+
+        fn(A, udata, strbuf(obj)[i]);
+      }
+
+      obj = cdr(obj);
+    }
+
+    if (strqt)
+      fn(A, udata, '"');
+    break;
+
+  default:
+    sprintf(buf, "[%s %p]", typenames[type(obj)], (void *)obj);
+    writestr(A, fn, udata, buf);
+    break;
+  }
+}
+
+void ape_set(ape_State *a, ape_Object *sym, ape_Object *val) {}
+
+ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
+  ape_Object *arg = *args;
+
+  if (type(arg) != APE_TPAIR) {
+    if (isnil(arg))
+      ape_error(A, "too few arguments");
+
+    ape_error(A, "dotted pair in argument list");
+  }
+
+  *args = cdr(arg);
+  return car(arg);
+}
+
+ape_Object *ape_eval(ape_State *A, ape_Object *obj) {}
