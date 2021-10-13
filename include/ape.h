@@ -96,6 +96,8 @@ APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
 APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_cdr(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt);
+APE_API ape_Object *ape_true(ape_State *A);
+APE_API ape_Object *ape_nil(ape_State *A);
 APE_API ape_Object *ape_bool(ape_State *A, int b);
 APE_API ape_Object *ape_integer(ape_State *A, ape_Integer d);
 APE_API ape_Object *ape_number(ape_State *A, ape_Number n);

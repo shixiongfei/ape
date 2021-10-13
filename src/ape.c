@@ -294,13 +294,14 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
   A->calllist = &nil;
   A->freelist = &nil;
   A->symlist = &nil;
-
-  /* init objects */
-  A->t = ape_symbol(A, "true");
-  ape_set(A, A->t, A->t);
+  A->env = &nil;
 
   /* global environment */
   A->env = ape_cons(A, &nil, &nil);
+
+  /* init objects */
+  A->t = ape_symbol(A, "true");
+  ape_def(A, A->t, A->t);
 
   /* register built in primitives */
   // TODO
@@ -451,7 +452,11 @@ ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt) {
   return list;
 }
 
-ape_Object *ape_bool(ape_State *A, int b) { return b ? A->t : &nil; }
+ape_Object *ape_true(ape_State *A) { return A->t; }
+
+ape_Object *ape_nil(ape_State *A) { return &nil; }
+
+ape_Object *ape_bool(ape_State *A, int b) { return b ? ape_true(A) : ape_nil(A); }
 
 ape_Object *ape_integer(ape_State *A, ape_Integer d) {
   ape_Object *obj = alloc(A);
@@ -711,7 +716,7 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
 
 static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
   /* Try to find in environment */
-  for (; recur && !isnil(env); env = cdr(env)) {
+  for (; !isnil(env); env = cdr(env)) {
     ape_Object *frame = car(env);
 
     for (; !isnil(frame); frame = cdr(frame)) {
@@ -720,6 +725,9 @@ static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
       if (car(x) == sym)
         return x;
     }
+
+    if (!recur)
+      return &nil;
   }
   return &nil;
 }
@@ -737,7 +745,7 @@ void ape_def(ape_State *A, ape_Object *sym, ape_Object *val) {
 void ape_set(ape_State *A, ape_Object *sym, ape_Object *val) {
   ape_Object *var = getbound(sym, A->env, 1);
 
-  if (isnil(val))
+  if (isnil(var))
     ape_error(A, "unbound variables cannot be set");
 
   cdr(var) = val;
