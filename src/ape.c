@@ -491,7 +491,7 @@ static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
 }
 
 ape_Object *ape_string(ape_State *A, const char *str) {
-  return ape_lstring(A, str, strlen(str));
+  return ape_lstring(A, str, (int)strlen(str));
 }
 
 ape_Object *ape_lstring(ape_State *A, const char *str, int len) {
@@ -525,7 +525,7 @@ static int strleq(ape_Object *obj, const char *str, int len) {
 }
 
 static int streq(ape_Object *obj, const char *str) {
-  return strleq(obj, str, strlen(str));
+  return strleq(obj, str, (int)strlen(str));
 }
 
 ape_Object *ape_symbol(ape_State *A, const char *name) {
@@ -685,7 +685,7 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
     break;
 
   default:
-    sprintf(buf, "[%s %p]", typenames[type(obj)], (void *)obj);
+    sprintf(buf, "[%s 0x%p]", typenames[type(obj)], (void *)obj);
     writestr(A, fn, udata, buf);
     break;
   }
