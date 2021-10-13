@@ -12,8 +12,8 @@
 #ifndef __APE_H__
 #define __APE_H__
 
-#include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #define APE_MAJOR 0
 #define APE_MINOR 1
@@ -114,9 +114,13 @@ APE_API ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata);
 APE_API void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn,
                        void *udata, int strqt);
 
-APE_API void ape_set(ape_State *a, ape_Object *sym, ape_Object *val);
+APE_API void ape_def(ape_State *A, ape_Object *sym, ape_Object *val);
+APE_API void ape_set(ape_State *A, ape_Object *sym, ape_Object *val);
 APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
 APE_API ape_Object *ape_eval(ape_State *A, ape_Object *obj);
+
+APE_API ape_Object *ape_readfp(ape_State *A, FILE *fp);
+APE_API void ape_writefp(ape_State *A, ape_Object *obj, FILE *fp);
 
 #ifdef __cplusplus
 };

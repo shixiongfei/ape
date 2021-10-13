@@ -10,7 +10,6 @@
  */
 
 #include "ape.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -134,6 +133,7 @@ struct ape_State {
   ape_Object *freelist;
   ape_Object *symlist;
   ape_Object *t;
+  ape_Object *env;
 };
 
 #define unused(x) ((void)x)
@@ -231,6 +231,7 @@ static void collect_garbage(ape_State *A) {
     ape_mark(A, A->gcstack[i]);
   }
   ape_mark(A, A->symlist);
+  ape_mark(A, A->env);
 
   /* sweep and unmark */
   for (chunk = A->chunks; chunk != NULL; chunk = chunk->next) {
@@ -297,6 +298,9 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
   /* init objects */
   A->t = ape_symbol(A, "true");
   ape_set(A, A->t, A->t);
+
+  /* global environment */
+  A->env = ape_cons(A, &nil, &nil);
 
   /* register built in primitives */
   // TODO
@@ -691,7 +695,53 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
   }
 }
 
-void ape_set(ape_State *a, ape_Object *sym, ape_Object *val) {}
+/*     Environment
+ * +--------+--------+
+ * | frames |   nil  |
+ * +---+----+--------+
+ *     |
+ * +--------+--------+     +--------+--------+
+ * | frame1 |   +----+-----+ frame2 |   nil  |
+ * +---+----+--------+     +---+----+--------+
+ *     |                       |
+ * +---+----+--------+     +---+----+--------+
+ * | Symbol | Object |     | Symbol | Object |
+ * +--------+--------+     +--------+--------+
+ */
+
+static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
+  /* Try to find in environment */
+  for (; recur && !isnil(env); env = cdr(env)) {
+    ape_Object *frame = car(env);
+
+    for (; !isnil(frame); frame = cdr(frame)) {
+      ape_Object *x = car(frame);
+
+      if (car(x) == sym)
+        return x;
+    }
+  }
+  return &nil;
+}
+
+void ape_def(ape_State *A, ape_Object *sym, ape_Object *val) {
+  ape_Object *var = getbound(sym, A->env, 0);
+
+  if (!isnil(var))
+    ape_error(A, "variables cannot be redefined");
+
+  var = ape_cons(A, sym, val);
+  car(A->env) = ape_cons(A, var, car(A->env));
+}
+
+void ape_set(ape_State *A, ape_Object *sym, ape_Object *val) {
+  ape_Object *var = getbound(sym, A->env, 1);
+
+  if (isnil(val))
+    ape_error(A, "unbound variables cannot be set");
+
+  cdr(var) = val;
+}
 
 ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
   ape_Object *arg = *args;
@@ -708,3 +758,22 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
 }
 
 ape_Object *ape_eval(ape_State *A, ape_Object *obj) {}
+
+static char readfp(ape_State *A, void *udata) {
+  int ch = fgetc((FILE *)udata);
+  unused(A);
+  return ch == EOF ? '\0' : ch;
+}
+
+ape_Object *ape_readfp(ape_State *A, FILE *fp) {
+  return ape_read(A, readfp, fp);
+}
+
+static void writefp(ape_State *A, void *udata, char ch) {
+  unused(A);
+  fputc(ch, (FILE *)udata);
+}
+
+void ape_writefp(ape_State *A, ape_Object *obj, FILE *fp) {
+  ape_write(A, obj, writefp, fp, 0);
+}
