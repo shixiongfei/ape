@@ -405,16 +405,6 @@ loop:
   }
 }
 
-int ape_type(ape_State *A, ape_Object *obj) {
-  unused(A);
-  return type(obj);
-}
-
-int ape_isnil(ape_State *A, ape_Object *obj) {
-  unused(A);
-  return isnil(obj);
-}
-
 int ape_length(ape_State *A, ape_Object *obj) {
   int len;
 
@@ -431,6 +421,21 @@ int ape_length(ape_State *A, ape_Object *obj) {
   }
 
   return ape_error(A, "not an iteratable object");
+}
+
+int ape_isnil(ape_State *A, ape_Object *obj) {
+  unused(A);
+  return isnil(obj);
+}
+
+int ape_type(ape_State *A, ape_Object *obj) {
+  unused(A);
+  return type(obj);
+}
+
+const char *ape_typename(ape_State *A, int type) {
+  unused(A);
+  return typenames[type];
 }
 
 static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
@@ -920,7 +925,7 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
   return car(arg);
 }
 
-ape_Object *ape_eval(ape_State *A, ape_Object *obj) {}
+ape_Object *ape_eval(ape_State *A, ape_Object *obj) { return obj; }
 
 static char readfp(ape_State *A, void *udata) {
   int ch = fgetc((FILE *)udata);

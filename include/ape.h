@@ -88,9 +88,10 @@ APE_API void ape_restoregc(ape_State *A, int idx);
 APE_API int ape_savegc(ape_State *A);
 APE_API void ape_mark(ape_State *A, ape_Object *obj);
 
-APE_API int ape_type(ape_State *A, ape_Object *obj);
-APE_API int ape_isnil(ape_State *A, ape_Object *obj);
 APE_API int ape_length(ape_State *A, ape_Object *obj);
+APE_API int ape_isnil(ape_State *A, ape_Object *obj);
+APE_API int ape_type(ape_State *A, ape_Object *obj);
+APE_API const char *ape_typename(ape_State *A, int type);
 
 APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
 APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
