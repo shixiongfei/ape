@@ -10,6 +10,7 @@
  */
 
 #include "ape.h"
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -47,11 +48,13 @@ enum {
 static const char *primnames[] = {
     "def", "set!", "cond", "fn",  "macro", "quote", "and",    "or",  "not",
     "xor", "do",   "cons", "car", "cdr",   "list",  "length", "is?", "print",
-    "=",   "<",    "<=",   ">",   ">=",    "+",     "-",      "*",   "/"};
+    "=",   "<",    "<=",   ">",   ">=",    "+",     "-",      "*",   "/",
+};
 
 static const char *typenames[] = {
     "pair",   "free",     "nil",   "integer",   "number",    "symbol",
-    "string", "function", "macro", "primitive", "cfunction", "pointer"};
+    "string", "function", "macro", "primitive", "cfunction", "pointer",
+};
 
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
@@ -103,18 +106,18 @@ typedef struct ape_Chunk {
   struct ape_Chunk *next;
 } ape_Chunk;
 
-/*                   Symbol List
+/*                        Symbol List
+ *      +--------+--------+        +--------+--------+
+ *      |  car   |   cdr  +--------+  car   |   nil  |
+ *      +---+----+--------+        +---+----+--------+
+ *          |                          |
  * +--------+--------+        +--------+--------+
- * |  car   |   cdr  +--------+  car   |   nil  |
- * +---+----+--------+        +---+----+--------+
- *     |                          |
- * +---+----+--------+        +---+----+--------+
  * | Symbol |        |        | Symbol |        |
  * +--------+---+----+        +--------+---+----+
  *              |                          |
- *          +---+----+--------+        +---+----+--------+
- *          | String |  ...   |        | String |  ...   |
- *          +--------+--------+        +--------+--------+
+ *     +--------+--------+        +--------+--------+
+ *     | String |  ...   |        | String |  ...   |
+ *     +--------+--------+        +--------+--------+
  */
 
 struct ape_State {
@@ -134,6 +137,8 @@ struct ape_State {
   ape_Object *symlist;
   ape_Object *t;
   ape_Object *env;
+
+  int next_char;
 };
 
 #define unused(x) ((void)x)
@@ -277,6 +282,32 @@ static ape_Object *alloc(ape_State *A) {
   return obj;
 }
 
+static ape_State *ape_init(ape_State *A) {
+  int i, top;
+
+  /* global environment */
+  A->env = ape_cons(A, &nil, &nil);
+
+  /* init objects */
+  A->t = ape_symbol(A, "true");
+  ape_def(A, A->t, A->t);
+
+  /* register built in primitives */
+  top = ape_savegc(A);
+
+  for (i = 0; i < P_MAX; ++i) {
+    ape_Object *v = alloc(A);
+
+    settype(v, APE_TPRIM);
+    prim(v) = i;
+
+    ape_def(A, ape_symbol(A, primnames[i]), v);
+    ape_restoregc(A, top);
+  }
+
+  return A;
+}
+
 ape_State *ape_newstate(ape_Alloc f, void *ud) {
   ape_Alloc alloc = f ? f : alloc_emul;
   ape_State *A = (ape_State *)alloc(ud, NULL, sizeof(ape_State));
@@ -296,17 +327,7 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
   A->symlist = &nil;
   A->env = &nil;
 
-  /* global environment */
-  A->env = ape_cons(A, &nil, &nil);
-
-  /* init objects */
-  A->t = ape_symbol(A, "true");
-  ape_def(A, A->t, A->t);
-
-  /* register built in primitives */
-  // TODO
-
-  return A;
+  return ape_init(A);
 }
 
 void ape_close(ape_State *A) {
@@ -456,7 +477,9 @@ ape_Object *ape_true(ape_State *A) { return A->t; }
 
 ape_Object *ape_nil(ape_State *A) { return &nil; }
 
-ape_Object *ape_bool(ape_State *A, int b) { return b ? ape_true(A) : ape_nil(A); }
+ape_Object *ape_bool(ape_State *A, int b) {
+  return b ? ape_true(A) : ape_nil(A);
+}
 
 ape_Object *ape_integer(ape_State *A, ape_Integer d) {
   ape_Object *obj = alloc(A);
@@ -608,7 +631,132 @@ void *ape_toptr(ape_State *A, ape_Object *obj) {
   return cdr(checktype(A, obj, APE_TPTR));
 }
 
-ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {}
+static ape_Object rparen = {0};
+
+static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
+  static const char *delimiter = "();";
+  ape_Object *v, *res, **tail;
+  ape_Integer d;
+  ape_Number n;
+  int ch, top;
+  char buf[64] = {0}, *p;
+
+  /* get next character */
+  ch = A->next_char ? A->next_char : fn(A, udata);
+  A->next_char = 0;
+
+  /* skip whitespace */
+  while (ch && isspace(ch))
+    ch = fn(A, udata);
+
+  switch (ch) {
+  case '\0':
+    return NULL;
+
+  case ';':
+    do {
+      ch = fn(A, udata);
+    } while (ch && ch != '\n');
+
+    return reader(A, fn, udata);
+
+  case ')':
+    return &rparen;
+
+  case '(':
+    res = &nil;
+    tail = &res;
+    top = ape_savegc(A);
+    ape_pushgc(A, res); /* to cause error on too-deep nesting */
+
+    while ((v = reader(A, fn, udata)) != &rparen) {
+      if (v == NULL)
+        ape_error(A, "syntax error: unclosed list");
+
+      if (type(v) == APE_TSYMBOL && streq(car(cdr(v)), "."))
+        /* dotted pair */
+        *tail = ape_read(A, fn, udata);
+      else {
+        /* proper pair */
+        *tail = ape_cons(A, v, &nil);
+        tail = &cdr(*tail);
+      }
+      ape_restoregc(A, top);
+      ape_pushgc(A, res);
+    }
+    return res;
+
+  case '\'':
+    v = ape_read(A, fn, udata);
+
+    if (!v)
+      ape_error(A, "syntax error: stray '");
+
+    /* Transform: '(...) => (quote (...)) */
+    return ape_cons(A, ape_symbol(A, "quote"), ape_cons(A, v, &nil));
+
+  case '"':
+    res = build_string(A, NULL, 0);
+    v = res;
+
+    ch = fn(A, udata);
+    while (ch != '"') {
+      if (ch == '\0')
+        ape_error(A, "syntax error: unclosed string");
+
+      if (ch == '\\') {
+        ch = fn(A, udata);
+
+        if (ch == '\0')
+          ape_error(A, "syntax error: unclosed string");
+
+        if (strchr("nrt\\\"", ch))
+          ch = strchr("n\nr\rt\t\\\\\"\"", ch)[1];
+      }
+
+      v = build_string(A, v, ch);
+      ch = fn(A, udata);
+    }
+    return res;
+
+  default:
+    p = buf;
+    do {
+      if (p == buf + sizeof(buf) - 1)
+        ape_error(A, "symbol too long");
+
+      *p++ = ch;
+      ch = fn(A, udata);
+    } while (ch && (!strchr(delimiter, ch) || !isspace(ch)));
+
+    A->next_char = ch;
+
+    /* try to read as integer */
+    d = strtol(buf, &p, 10);
+
+    if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
+      return ape_integer(A, d);
+
+    /* try to read as number */
+    n = strtod(buf, &p);
+
+    if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
+      return ape_number(A, n);
+
+    if (!strcmp(buf, "nil"))
+      return &nil;
+
+    return ape_symbol(A, buf);
+  }
+
+  return NULL;
+}
+
+ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {
+  ape_Object *obj = reader(A, fn, udata);
+
+  return obj;
+}
 
 static void writestr(ape_State *A, ape_WriteFunc fn, void *udata,
                      const char *str) {
@@ -700,16 +848,16 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
   }
 }
 
-/*     Environment
- * +--------+--------+
- * | frames |   nil  |
- * +---+----+--------+
- *     |
+/*                            Environment
+ *           +--------+--------+     +--------+--------+
+ *           | frames |   +----+-----+ frames |   nil  |
+ *           +---+----+--------+     +--------+--------+
+ *               |
+ *      +--------+--------+     +--------+--------+
+ *      | frame1 |   +----+-----+ frame2 |   nil  |
+ *      +---+----+--------+     +---+----+--------+
+ *          |                       |
  * +--------+--------+     +--------+--------+
- * | frame1 |   +----+-----+ frame2 |   nil  |
- * +---+----+--------+     +---+----+--------+
- *     |                       |
- * +---+----+--------+     +---+----+--------+
  * | Symbol | Object |     | Symbol | Object |
  * +--------+--------+     +--------+--------+
  */
