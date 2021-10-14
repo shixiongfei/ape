@@ -120,7 +120,7 @@ APE_API void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn,
 APE_API void ape_def(ape_State *A, ape_Object *sym, ape_Object *val);
 APE_API void ape_set(ape_State *A, ape_Object *sym, ape_Object *val);
 APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
-APE_API ape_Object *ape_eval(ape_State *A, ape_Object *obj);
+APE_API ape_Object *ape_eval(ape_State *A, ape_Object *expr);
 
 APE_API ape_Object *ape_readfp(ape_State *A, FILE *fp);
 APE_API void ape_writefp(ape_State *A, ape_Object *obj, FILE *fp);

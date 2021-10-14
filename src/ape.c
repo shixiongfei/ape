@@ -290,6 +290,7 @@ static ape_State *ape_init(ape_State *A) {
 
   /* init objects */
   A->t = ape_symbol(A, "true");
+  ape_def(A, A->t, A->t);
 
   /* register built in primitives */
   for (i = 0; i < P_MAX; ++i) {
@@ -379,7 +380,7 @@ int ape_savegc(ape_State *A) { return A->gcstack_idx; }
 void ape_mark(ape_State *A, ape_Object *obj) {
   ape_Object *car;
 
-loop:
+LOOP:
   if (tag(obj) & GCMARKBIT)
     return;
 
@@ -396,7 +397,7 @@ loop:
   case APE_TSYMBOL:
   case APE_TSTRING:
     obj = cdr(obj);
-    goto loop;
+    goto LOOP;
 
   case APE_TPTR:
     if (A->handlers.mark)
@@ -752,9 +753,6 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     if (!strcmp(buf, "nil"))
       return &nil;
 
-    if (!strcmp(buf, "true"))
-      return A->t;
-
     return ape_symbol(A, buf);
   }
 
@@ -764,9 +762,9 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {
   ape_Object *obj = reader(A, fn, udata);
 
-  if (obj == &rparen) 
+  if (obj == &rparen)
     ape_error(A, "stray ')'");
-  
+
   return obj;
 }
 
@@ -925,7 +923,27 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
   return car(arg);
 }
 
-ape_Object *ape_eval(ape_State *A, ape_Object *obj) { return obj; }
+static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
+  if (type(expr) == APE_TSYMBOL) {
+    ape_Object *var = getbound(expr, env, 1);
+
+    if (isnil(var))
+      ape_error(A, "unbound variables");
+
+    return cdr(var);
+  }
+
+  if (type(expr) != APE_TPAIR)
+    return expr;
+
+EVAL:
+
+  return expr;
+}
+
+ape_Object *ape_eval(ape_State *A, ape_Object *expr) {
+  return eval(A, expr, A->env);
+}
 
 static char readfp(ape_State *A, void *udata) {
   int ch = fgetc((FILE *)udata);
