@@ -283,18 +283,15 @@ static ape_Object *alloc(ape_State *A) {
 }
 
 static ape_State *ape_init(ape_State *A) {
-  int i, top;
+  int i, top = ape_savegc(A);
 
   /* global environment */
   A->env = ape_cons(A, &nil, &nil);
 
   /* init objects */
   A->t = ape_symbol(A, "true");
-  ape_def(A, A->t, A->t);
 
   /* register built in primitives */
-  top = ape_savegc(A);
-
   for (i = 0; i < P_MAX; ++i) {
     ape_Object *v = alloc(A);
 
@@ -671,9 +668,9 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     while ((v = reader(A, fn, udata)) != &rparen) {
       if (v == NULL)
-        ape_error(A, "syntax error: unclosed list");
+        ape_error(A, "unclosed list");
 
-      if (type(v) == APE_TSYMBOL && streq(car(cdr(v)), "."))
+      if (type(v) == APE_TSYMBOL && streq(cdr(v), "."))
         /* dotted pair */
         *tail = ape_read(A, fn, udata);
       else {
@@ -690,7 +687,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     v = ape_read(A, fn, udata);
 
     if (!v)
-      ape_error(A, "syntax error: stray '");
+      ape_error(A, "stray '''");
 
     /* Transform: '(...) => (quote (...)) */
     return ape_cons(A, ape_symbol(A, "quote"), ape_cons(A, v, &nil));
@@ -702,13 +699,13 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     ch = fn(A, udata);
     while (ch != '"') {
       if (ch == '\0')
-        ape_error(A, "syntax error: unclosed string");
+        ape_error(A, "unclosed string");
 
       if (ch == '\\') {
         ch = fn(A, udata);
 
         if (ch == '\0')
-          ape_error(A, "syntax error: unclosed string");
+          ape_error(A, "unclosed string");
 
         if (strchr("nrt\\\"", ch))
           ch = strchr("n\nr\rt\t\\\\\"\"", ch)[1];
@@ -727,12 +724,16 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
       *p++ = ch;
       ch = fn(A, udata);
-    } while (ch && (!strchr(delimiter, ch) || !isspace(ch)));
+    } while (ch && !strchr(delimiter, ch) && !isspace(ch));
 
     A->next_char = ch;
 
     /* try to read as integer */
+#if UINTPTR_MAX > (1ULL << 32)
+    d = strtoll(buf, &p, 10);
+#else
     d = strtol(buf, &p, 10);
+#endif
 
     if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
       return ape_integer(A, d);
@@ -746,6 +747,9 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     if (!strcmp(buf, "nil"))
       return &nil;
 
+    if (!strcmp(buf, "true"))
+      return A->t;
+
     return ape_symbol(A, buf);
   }
 
@@ -755,6 +759,9 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {
   ape_Object *obj = reader(A, fn, udata);
 
+  if (obj == &rparen) 
+    ape_error(A, "stray ')'");
+  
   return obj;
 }
 
