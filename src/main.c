@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
   ape_State *A = ape_newstate(NULL, NULL);
   FILE *fp = stdin;
   ape_Object *expr, *retval;
-  int gctop, prompt;
+  int gctop, prompt = 0;
 
   printf("Ape v%s\n\n", APE_VERSION);
 
@@ -43,8 +43,9 @@ int main(int argc, char *argv[]) {
   setjmp(toplevel);
 
   /* repl */
-  for (prompt = 1; ; ++prompt) {
+  for (;;) {
     ape_restoregc(A, gctop);
+    prompt += 1;
 
     if (fp == stdin)
       printf("%d| in> ", prompt);
