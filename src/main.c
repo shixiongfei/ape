@@ -13,6 +13,7 @@
 #include <setjmp.h>
 #include <stdio.h>
 
+static long prompt = 0;
 static jmp_buf toplevel;
 
 static void on_error(ape_State *A, const char *msg, ape_Object *call_list) {
@@ -23,8 +24,8 @@ static void on_error(ape_State *A, const char *msg, ape_Object *call_list) {
 int main(int argc, char *argv[]) {
   ape_State *A = ape_newstate(NULL, NULL);
   FILE *fp = stdin;
-  ape_Object *expr, *retval;
-  int gctop, prompt = 0;
+  ape_Object *expr;
+  int gctop;
 
   printf("Ape v%s\n\n", APE_VERSION);
 
@@ -48,18 +49,18 @@ int main(int argc, char *argv[]) {
     prompt += 1;
 
     if (fp == stdin)
-      printf("%d| in> ", prompt);
+      printf("%ld| in> ", prompt);
 
     expr = ape_readfp(A, fp);
 
     if (!expr)
       break;
 
-    retval = ape_eval(A, expr);
+    expr = ape_eval(A, expr);
 
     if (fp == stdin) {
-      printf("%d|out> ", prompt);
-      ape_writefp(A, retval, stdout);
+      printf("%ld|out> ", prompt);
+      ape_writefp(A, expr, stdout);
       printf("\n");
     }
   }

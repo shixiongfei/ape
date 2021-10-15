@@ -91,11 +91,12 @@ APE_API void ape_mark(ape_State *A, ape_Object *obj);
 APE_API int ape_length(ape_State *A, ape_Object *obj);
 APE_API int ape_isnil(ape_State *A, ape_Object *obj);
 APE_API int ape_type(ape_State *A, ape_Object *obj);
-APE_API const char *ape_typename(ape_State *A, int type);
 
 APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
 APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_cdr(ape_State *A, ape_Object *obj);
+APE_API ape_Object *ape_setcar(ape_State *A, ape_Object *obj, ape_Object *car);
+APE_API ape_Object *ape_setcdr(ape_State *A, ape_Object *obj, ape_Object *cdr);
 APE_API ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt);
 APE_API ape_Object *ape_true(ape_State *A);
 APE_API ape_Object *ape_nil(ape_State *A);
@@ -117,8 +118,10 @@ APE_API ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata);
 APE_API void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn,
                        void *udata, int strqt);
 
-APE_API void ape_def(ape_State *A, ape_Object *sym, ape_Object *val);
-APE_API void ape_set(ape_State *A, ape_Object *sym, ape_Object *val);
+APE_API ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
+                            ape_Object *env);
+APE_API ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
+                            ape_Object *env);
 APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
 APE_API ape_Object *ape_eval(ape_State *A, ape_Object *expr);
 

@@ -24,14 +24,15 @@ enum {
   P_AND,
   P_OR,
   P_NOT,
-  P_XOR,
   P_DO,
   P_CONS,
   P_CAR,
   P_CDR,
+  P_SETCAR,
+  P_SETCDR,
   P_LIST,
   P_LENGTH,
-  P_IS,
+  P_TYPE,
   P_PRINT,
   P_EQ,
   P_LT,
@@ -46,9 +47,10 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def", "set!", "cond", "fn",  "macro", "quote", "and",    "or",  "not",
-    "xor", "do",   "cons", "car", "cdr",   "list",  "length", "is?", "print",
-    "=",   "<",    "<=",   ">",   ">=",    "+",     "-",      "*",   "/",
+    "def",      "set!", "cond",   "fn",   "macro", "quote", "and",
+    "or",       "not",  "do",     "cons", "car",   "cdr",   "set-car!",
+    "set-cdr!", "list", "length", "type", "print", "=",     "<",
+    "<=",       ">",    ">=",     "+",    "-",     "*",     "/",
 };
 
 static const char *typenames[] = {
@@ -290,7 +292,7 @@ static ape_State *ape_init(ape_State *A) {
 
   /* init objects */
   A->t = ape_symbol(A, "true");
-  ape_def(A, A->t, A->t);
+  ape_def(A, A->t, A->t, NULL);
 
   /* register built in primitives */
   for (i = 0; i < P_MAX; ++i) {
@@ -299,7 +301,7 @@ static ape_State *ape_init(ape_State *A) {
     settype(v, APE_TPRIM);
     prim(v) = i;
 
-    ape_def(A, ape_symbol(A, primnames[i]), v);
+    ape_def(A, ape_symbol(A, primnames[i]), v, NULL);
     ape_restoregc(A, top);
   }
 
@@ -434,11 +436,6 @@ int ape_type(ape_State *A, ape_Object *obj) {
   return type(obj);
 }
 
-const char *ape_typename(ape_State *A, int type) {
-  unused(A);
-  return typenames[type];
-}
-
 static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
   if (type(obj) != type) {
     char buf[64];
@@ -465,6 +462,16 @@ ape_Object *ape_cdr(ape_State *A, ape_Object *obj) {
   if (isnil(obj))
     return obj;
   return cdr(checktype(A, obj, APE_TPAIR));
+}
+
+ape_Object *ape_setcar(ape_State *A, ape_Object *obj, ape_Object *car) {
+  car(checktype(A, obj, APE_TPAIR)) = car;
+  return obj;
+}
+
+ape_Object *ape_setcdr(ape_State *A, ape_Object *obj, ape_Object *cdr) {
+  cdr(checktype(A, obj, APE_TPAIR)) = cdr;
+  return obj;
 }
 
 ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt) {
@@ -890,23 +897,27 @@ static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
   return &nil;
 }
 
-void ape_def(ape_State *A, ape_Object *sym, ape_Object *val) {
-  ape_Object *var = getbound(sym, A->env, 0);
+ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
+                    ape_Object *env) {
+  ape_Object *var = getbound(sym, env ? env : A->env, 0);
 
   if (!isnil(var))
     ape_error(A, "variables cannot be redefined");
 
   var = ape_cons(A, sym, val);
   car(A->env) = ape_cons(A, var, car(A->env));
+  return val;
 }
 
-void ape_set(ape_State *A, ape_Object *sym, ape_Object *val) {
-  ape_Object *var = getbound(sym, A->env, 1);
+ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
+                    ape_Object *env) {
+  ape_Object *var = getbound(sym, env ? env : A->env, 1);
 
   if (isnil(var))
     ape_error(A, "unbound variables cannot be set");
 
   cdr(var) = val;
+  return val;
 }
 
 ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
@@ -923,7 +934,53 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
   return car(arg);
 }
 
+static int equal(ape_Object *a, ape_Object *b) {
+  if (a == b)
+    return 1;
+
+  if (type(a) != type(b))
+    return 0;
+
+  if (type(a) == APE_TINTEGER)
+    return integer(a) == integer(b);
+
+  if (type(a) == APE_TNUMBER)
+    return number(a) == number(b);
+
+  if (type(a) == APE_TSTRING) {
+    for (; !isnil(a); a = cdr(a), b = cdr(b))
+      if (car(a) != car(b))
+        return 0;
+
+    return a == b;
+  }
+
+  return 0;
+}
+
+static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env);
+
+#define evalarg() eval(A, ape_nextarg(A, &args), env)
+
+static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
+  ape_Object *res = &nil;
+  ape_Object **tail = &res;
+
+  while (!isnil(list)) {
+    *tail = ape_cons(A, eval(A, ape_nextarg(A, &list), env), &nil);
+    tail = &cdr(*tail);
+  }
+
+  return res;
+}
+
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
+  ape_Object *fn, *args;
+  ape_Object cl;
+  ape_Object *res, *va, *vb; /* registers */
+  int gctop;
+
+EVAL:
   if (type(expr) == APE_TSYMBOL) {
     ape_Object *var = getbound(expr, env, 1);
 
@@ -936,9 +993,140 @@ static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   if (type(expr) != APE_TPAIR)
     return expr;
 
-EVAL:
+  car(&cl) = expr;
+  cdr(&cl) = A->calllist;
+  A->calllist = &cl;
 
-  return expr;
+  gctop = ape_savegc(A);
+
+  fn = eval(A, car(expr), env);
+  args = cdr(expr);
+  res = &nil;
+
+  switch (type(fn)) {
+  case APE_TPRIM:
+    switch (prim(fn)) {
+    case P_DEF:
+      va = checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      res = ape_def(A, va, evalarg(), env);
+      break;
+    case P_SET:
+      va = checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      res = ape_set(A, va, evalarg(), env);
+      break;
+    case P_COND:
+      while (!isnil(args)) {
+        va = evalarg();
+
+        if (!isnil(va)) {
+          res = isnil(args) ? va : evalarg();
+          break;
+        }
+
+        if (isnil(args))
+          break;
+
+        args = cdr(args);
+      }
+      break;
+    case P_FN:
+    case P_MACRO:
+      break;
+    case P_QUOTE:
+      res = ape_nextarg(A, &args);
+      break;
+    case P_AND:
+      while (!isnil(args) && !isnil(res = evalarg()))
+        ;
+      break;
+    case P_OR:
+      while (!isnil(args) && isnil(res = evalarg()))
+        ;
+      break;
+    case P_NOT:
+      res = ape_bool(A, isnil(evalarg()));
+      break;
+    case P_DO:
+      break;
+    case P_CONS:
+      va = evalarg();
+      res = ape_cons(A, va, evalarg());
+      break;
+    case P_CAR:
+      res = ape_car(A, evalarg());
+      break;
+    case P_CDR:
+      res = ape_cdr(A, evalarg());
+      break;
+    case P_SETCAR:
+      va = evalarg();
+      res = ape_setcar(A, va, evalarg());
+      break;
+    case P_SETCDR:
+      va = evalarg();
+      res = ape_setcdr(A, va, evalarg());
+      break;
+    case P_LIST:
+      res = eval_list(A, args, env);
+      break;
+    case P_LENGTH:
+      res = ape_integer(A, ape_length(A, evalarg()));
+      break;
+    case P_TYPE:
+      va = evalarg();
+      res = ape_symbol(A, typenames[type(va)]);
+      break;
+    case P_PRINT:
+      while (!isnil(args)) {
+        ape_writefp(A, evalarg(), stdout);
+
+        if (!isnil(args))
+          printf(" ");
+      }
+      printf("\n");
+      break;
+    case P_EQ:
+      va = evalarg();
+      res = ape_bool(A, equal(va, evalarg()));
+      break;
+    case P_LT:
+      break;
+    case P_LTE:
+      break;
+    case P_GT:
+      break;
+    case P_GTE:
+      break;
+    case P_ADD:
+      break;
+    case P_SUB:
+      break;
+    case P_MUL:
+      break;
+    case P_DIV:
+      break;
+    default:
+      ape_error(A, "undefined primitive");
+      break;
+    }
+    break;
+  case APE_TCFUNC:
+    res = cfunc(fn)(A, eval_list(A, args, env));
+    break;
+  case APE_TFUNC:
+    break;
+  case APE_TMACRO:
+    break;
+  default:
+    ape_error(A, "tried to call non-callable value");
+    break;
+  }
+
+  ape_restoregc(A, gctop);
+  ape_pushgc(A, res);
+  A->calllist = cdr(&cl);
+
+  return res;
 }
 
 ape_Object *ape_eval(ape_State *A, ape_Object *expr) {
