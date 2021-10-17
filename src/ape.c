@@ -1236,6 +1236,13 @@ EVAL:
       res = ape_bool(A, isnil(evalarg()));
       break;
     case P_DO:
+      if (!isnil(args)) {
+        for (; !isnil(cdr(args)); args = cdr(args))
+          eval(A, car(args), env);
+
+        expr = car(args);
+        goto EVAL;
+      }
       break;
     case P_CONS:
       va = evalarg();
