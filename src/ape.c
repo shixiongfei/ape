@@ -165,6 +165,21 @@ struct ape_State {
 #define integer(x) ((x)->cdr.d)
 #define number(x) ((x)->cdr.n)
 #define digits(x) (type(x) == APE_TNUMBER ? number(x) : integer(x))
+
+/*      Function / Macro
+ * +------------------+-----+
+ * | Function / Macro | cdr |
+ * +------------------+--+--+
+ *                       |
+ *                 +-----+---------+
+ *                 | car | do list |
+ *                 +--+--+---------+
+ *                    |
+ *              +-----+------+
+ *              | env | args |
+ *              +-----+------+
+ */
+
 #define prim(x) ((x)->cdr.c)
 #define cfunc(x) ((x)->cdr.f)
 
@@ -215,6 +230,8 @@ static int extend_chunks(ape_State *A) {
 
   if (!chunk)
     return -1;
+
+  memset(chunk, 0, sizeof(ape_Chunk));
 
   /* push to the chunks list */
   chunk->next = A->chunks;
@@ -910,13 +927,16 @@ static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
 
 ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
                     ape_Object *env) {
-  ape_Object *var = getbound(sym, env ? env : A->env, 0);
+  ape_Object *var;
+
+  env = env ? env : A->env;
+  var = getbound(sym, env, 0);
 
   if (!isnil(var))
     ape_error(A, "variables cannot be redefined");
 
   var = ape_cons(A, sym, val);
-  car(A->env) = ape_cons(A, var, car(A->env));
+  car(env) = ape_cons(A, var, car(env));
   return val;
 }
 
@@ -1163,6 +1183,24 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
     }                                                                          \
   } while (0)
 
+static void env_locals(ape_State *A, ape_Object *syms, ape_Object *args,
+                       ape_Object *env) {
+  while (!isnil(syms)) {
+    if (type(syms) != APE_TPAIR) {
+      ape_def(A, syms, args, env);
+      return;
+    }
+
+    if (isnil(args))
+      ape_error(A, "wrong number of arguments");
+
+    ape_def(A, car(syms), car(args), env);
+
+    syms = cdr(syms);
+    args = cdr(args);
+  }
+}
+
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
@@ -1220,6 +1258,11 @@ EVAL:
       break;
     case P_FN:
     case P_MACRO:
+      va = ape_cons(A, env, ape_nextarg(A, &args));
+      vb = ape_cons(A, ape_symbol(A, "do"), args);
+      res = alloc(A);
+      settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
+      cdr(res) = ape_cons(A, va, vb);
       break;
     case P_QUOTE:
       res = ape_nextarg(A, &args);
@@ -1241,6 +1284,8 @@ EVAL:
           eval(A, car(args), env);
 
         expr = car(args);
+        ape_restoregc(A, gctop);
+        A->calllist = cdr(&cl);
         goto EVAL;
       }
       break;
@@ -1318,8 +1363,33 @@ EVAL:
     res = cfunc(fn)(A, eval_list(A, args, env));
     break;
   case APE_TFUNC:
+    va = cdr(fn); /* ((env . args) . (do ...)) */
+    vb = car(va); /* (env . args)*/
+
+    /* new local environment */
+    env = ape_cons(A, &nil, car(vb));
+    args = eval_list(A, args, env);
+    env_locals(A, cdr(vb), args, env);
+
+    expr = cdr(va); /* do block */
+    ape_restoregc(A, gctop);
+    A->calllist = cdr(&cl);
+    goto EVAL;
     break;
   case APE_TMACRO:
+    va = cdr(fn); /* ((env . args) . (do ...)) */
+    vb = car(va); /* (env . args)*/
+
+    /* arguments environment */
+    env = ape_cons(A, &nil, car(vb));
+    env_locals(A, cdr(vb), args, env);
+
+    expr = eval(A, cdr(va), env); /* generate code by macro */
+    env = cdr(env); /* resotre environment */
+
+    ape_restoregc(A, gctop);
+    A->calllist = cdr(&cl);
+    goto EVAL;
     break;
   default:
     ape_error(A, "tried to call non-callable value");
