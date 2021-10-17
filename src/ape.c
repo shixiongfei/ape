@@ -11,6 +11,7 @@
 
 #include "ape.h"
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -345,7 +346,7 @@ void ape_close(ape_State *A) {
 
 ape_Handlers *ape_handlers(ape_State *A) { return &A->handlers; }
 
-int ape_error(ape_State *A, const char *errmsg) {
+static void raise_error(ape_State *A, const char *errmsg) {
   ape_Object *cl = A->calllist;
 
   /* reset context state */
@@ -365,6 +366,18 @@ int ape_error(ape_State *A, const char *errmsg) {
   }
 
   exit(EXIT_FAILURE);
+}
+
+int ape_error(ape_State *A, const char *format, ...) {
+  char errmsg[64] = {0};
+  va_list args;
+
+  va_start(args, format);
+
+  vsnprintf(errmsg, sizeof(errmsg), format, args);
+  raise_error(A, errmsg);
+
+  va_end(args);
   return -1;
 }
 
@@ -437,11 +450,8 @@ int ape_type(ape_State *A, ape_Object *obj) {
 }
 
 static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
-  if (type(obj) != type) {
-    char buf[64];
-    sprintf(buf, "expected %s, got %s", typenames[type], typenames[type(obj)]);
-    ape_error(A, buf);
-  }
+  if (type(obj) != type)
+    ape_error(A, "expected %s, got %s", typenames[type], typenames[type(obj)]);
   return obj;
 }
 
@@ -974,6 +984,166 @@ static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
   return res;
 }
 
+static ape_Object *check_arith(ape_State *A, ape_Object *obj) {
+  if (type(obj) != APE_TINTEGER && type(obj) != APE_TNUMBER)
+    ape_error(A, "expected %s or %s, got %s", typenames[APE_TINTEGER],
+              typenames[APE_TNUMBER], typenames[type(obj)]);
+  return obj;
+}
+
+static ape_Object *arith_addfloat(ape_State *A, ape_Object *args,
+                                  ape_Object *env, ape_Number res) {
+  while (!isnil(args)) {
+    ape_Object *x = check_arith(A, evalarg());
+
+    res += type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+  }
+
+  return ape_number(A, res);
+}
+
+static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Integer res = 0;
+
+  while (!isnil(args)) {
+    ape_Object *x = check_arith(A, evalarg());
+
+    if (type(x) == APE_TNUMBER)
+      return arith_addfloat(A, args, env, (ape_Number)res + number(x));
+
+    res += integer(x);
+  }
+
+  return ape_integer(A, res);
+}
+
+static ape_Object *arith_subfloat(ape_State *A, ape_Object *args,
+                                  ape_Object *env, ape_Number res, int first) {
+  if (first && isnil(args))
+    return ape_number(A, -res);
+
+  while (!isnil(args)) {
+    ape_Object *x = check_arith(A, evalarg());
+
+    res -= type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+  }
+
+  return ape_number(A, res);
+}
+
+static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Integer res;
+  ape_Object *x;
+
+  if (isnil(args))
+    ape_error(A, "wrong number of operands");
+
+  x = check_arith(A, evalarg());
+
+  if (type(x) == APE_TNUMBER)
+    return arith_subfloat(A, args, env, number(x), 1);
+
+  if (isnil(args))
+    return ape_integer(A, -integer(x));
+
+  res = integer(x);
+
+  while (!isnil(args)) {
+    x = check_arith(A, evalarg());
+
+    if (type(x) == APE_TNUMBER)
+      return arith_subfloat(A, args, env, (ape_Number)res - number(x), 0);
+
+    res -= integer(x);
+  }
+
+  return ape_integer(A, res);
+}
+
+static ape_Object *arith_mulfloat(ape_State *A, ape_Object *args,
+                                  ape_Object *env, ape_Number res) {
+  while (!isnil(args)) {
+    ape_Object *x = check_arith(A, evalarg());
+
+    res *= type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+  }
+
+  return ape_number(A, res);
+}
+
+static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Integer res = 1;
+
+  while (!isnil(args)) {
+    ape_Object *x = check_arith(A, evalarg());
+
+    if (type(x) == APE_TNUMBER)
+      return arith_mulfloat(A, args, env, (ape_Number)res * number(x));
+
+    res *= integer(x);
+  }
+
+  return ape_integer(A, res);
+}
+
+static ape_Object *arith_divfloat(ape_State *A, ape_Object *args,
+                                  ape_Object *env, ape_Number res) {
+  while (!isnil(args)) {
+    ape_Object *x = check_arith(A, evalarg());
+
+    res /= type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+  }
+
+  return ape_number(A, res);
+}
+
+static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Integer res = 1;
+  ape_Object *x;
+
+  if (isnil(args))
+    ape_error(A, "wrong number of operands");
+
+  x = check_arith(A, evalarg());
+
+  if (type(x) == APE_TNUMBER)
+    return arith_divfloat(A, args, env, (ape_Number)res / number(x));
+
+  if (isnil(args))
+    return ape_integer(A, res / integer(x));
+
+  res = integer(x);
+
+  while (!isnil(args)) {
+    x = check_arith(A, evalarg());
+
+    if (type(x) == APE_TNUMBER)
+      return arith_divfloat(A, args, env, (ape_Number)res / number(x));
+
+    res /= integer(x);
+  }
+
+  return ape_integer(A, res);
+}
+
+static ape_Object *arithop(ape_State *A, ape_Object *args, ape_Object *env,
+                           char op) {
+  switch (op) {
+  case '+':
+    return arith_add(A, args, env);
+  case '-':
+    return arith_sub(A, args, env);
+  case '*':
+    return arith_mul(A, args, env);
+  case '/':
+    return arith_div(A, args, env);
+  default:
+    ape_error(A, "undefined arithmetic operator");
+    return &nil;
+  }
+  return &nil;
+}
+
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
@@ -1098,12 +1268,16 @@ EVAL:
     case P_GTE:
       break;
     case P_ADD:
+      res = arithop(A, args, env, '+');
       break;
     case P_SUB:
+      res = arithop(A, args, env, '-');
       break;
     case P_MUL:
+      res = arithop(A, args, env, '*');
       break;
     case P_DIV:
+      res = arithop(A, args, env, '/');
       break;
     default:
       ape_error(A, "undefined primitive");

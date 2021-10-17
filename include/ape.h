@@ -81,7 +81,7 @@ APE_API ape_State *ape_newstate(ape_Alloc f, void *ud);
 APE_API void ape_close(ape_State *A);
 
 APE_API ape_Handlers *ape_handlers(ape_State *A);
-APE_API int ape_error(ape_State *A, const char *errmsg);
+APE_API int ape_error(ape_State *A, const char *format, ...);
 
 APE_API void ape_pushgc(ape_State *A, ape_Object *obj);
 APE_API void ape_restoregc(ape_State *A, int idx);
