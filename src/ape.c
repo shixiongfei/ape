@@ -1183,7 +1183,7 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
     }                                                                          \
   } while (0)
 
-static void env_locals(ape_State *A, ape_Object *syms, ape_Object *args,
+static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
                        ape_Object *env) {
   while (!isnil(syms)) {
     if (type(syms) != APE_TPAIR) {
@@ -1259,7 +1259,7 @@ EVAL:
     case P_FN:
     case P_MACRO:
       va = ape_cons(A, env, ape_nextarg(A, &args));
-      vb = ape_cons(A, ape_symbol(A, "do"), args);
+      vb = ape_cons(A, ape_symbol(A, primnames[P_DO]), args);
       res = alloc(A);
       settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
       cdr(res) = ape_cons(A, va, vb);
@@ -1284,6 +1284,7 @@ EVAL:
           eval(A, car(args), env);
 
         expr = car(args);
+
         ape_restoregc(A, gctop);
         A->calllist = cdr(&cl);
         goto EVAL;
@@ -1369,9 +1370,10 @@ EVAL:
     /* new local environment */
     env = ape_cons(A, &nil, car(vb));
     args = eval_list(A, args, env);
-    env_locals(A, cdr(vb), args, env);
+    args_binds(A, cdr(vb), args, env);
 
     expr = cdr(va); /* do block */
+
     ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
     goto EVAL;
@@ -1382,10 +1384,10 @@ EVAL:
 
     /* arguments environment */
     env = ape_cons(A, &nil, car(vb));
-    env_locals(A, cdr(vb), args, env);
+    args_binds(A, cdr(vb), args, env);
 
     expr = eval(A, cdr(va), env); /* generate code by macro */
-    env = cdr(env); /* resotre environment */
+    env = cdr(env);               /* restore environment */
 
     ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
