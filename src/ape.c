@@ -1018,10 +1018,7 @@ static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
 }
 
 static ape_Object *arith_subfloat(ape_State *A, ape_Object *args,
-                                  ape_Object *env, ape_Number res, int first) {
-  if (first && isnil(args))
-    return ape_number(A, -res);
-
+                                  ape_Object *env, ape_Number res) {
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
 
@@ -1040,11 +1037,12 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
 
   x = check_arith(A, evalarg());
 
-  if (type(x) == APE_TNUMBER)
-    return arith_subfloat(A, args, env, number(x), 1);
-
   if (isnil(args))
-    return ape_integer(A, -integer(x));
+    return type(x) == APE_TNUMBER ? ape_number(A, -number(x))
+                                  : ape_integer(A, -integer(x));
+
+  if (type(x) == APE_TNUMBER)
+    return arith_subfloat(A, args, env, number(x));
 
   res = integer(x);
 
@@ -1052,7 +1050,7 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
     x = check_arith(A, evalarg());
 
     if (type(x) == APE_TNUMBER)
-      return arith_subfloat(A, args, env, (ape_Number)res - number(x), 0);
+      return arith_subfloat(A, args, env, (ape_Number)res - number(x));
 
     res -= integer(x);
   }
@@ -1086,62 +1084,61 @@ static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_integer(A, res);
 }
 
+static ape_Object *check_divzero(ape_State *A, ape_Object *obj) {
+  obj = check_arith(A, obj);
+
+  if (type(obj) == APE_TINTEGER && integer(obj) == 0)
+    ape_error(A, "division by zero");
+
+  if (type(obj) == APE_TNUMBER && number(obj) == 0.0)
+    ape_error(A, "division by zero");
+
+  return obj;
+}
+
 static ape_Object *arith_divfloat(ape_State *A, ape_Object *args,
                                   ape_Object *env, ape_Number res) {
   while (!isnil(args)) {
-    ape_Object *x = check_arith(A, evalarg());
+    ape_Object *x = check_divzero(A, evalarg());
 
-    res /= type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+    res /= type(x) == APE_TNUMBER ? number(x) : integer(x);
   }
 
   return ape_number(A, res);
 }
 
 static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Integer res = 1;
+  ape_Integer res;
   ape_Object *x;
 
   if (isnil(args))
     ape_error(A, "wrong number of operands");
 
-  x = check_arith(A, evalarg());
+  x = check_divzero(A, evalarg());
+
+  if (isnil(args)) {
+    ape_Number r = 1.0 / (type(x) == APE_TNUMBER ? number(x) : integer(x));
+    return ape_number(A, r);
+  }
 
   if (type(x) == APE_TNUMBER)
-    return arith_divfloat(A, args, env, (ape_Number)res / number(x));
-
-  if (isnil(args))
-    return ape_integer(A, res / integer(x));
+    return arith_divfloat(A, args, env, number(x));
 
   res = integer(x);
 
   while (!isnil(args)) {
-    x = check_arith(A, evalarg());
+    x = check_divzero(A, evalarg());
 
     if (type(x) == APE_TNUMBER)
       return arith_divfloat(A, args, env, (ape_Number)res / number(x));
+
+    if (res % integer(x) != 0)
+      return arith_divfloat(A, args, env, (ape_Number)res / integer(x));
 
     res /= integer(x);
   }
 
   return ape_integer(A, res);
-}
-
-static ape_Object *arithop(ape_State *A, ape_Object *args, ape_Object *env,
-                           char op) {
-  switch (op) {
-  case '+':
-    return arith_add(A, args, env);
-  case '-':
-    return arith_sub(A, args, env);
-  case '*':
-    return arith_mul(A, args, env);
-  case '/':
-    return arith_div(A, args, env);
-  default:
-    ape_error(A, "undefined arithmetic operator");
-    return &nil;
-  }
-  return &nil;
 }
 
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
@@ -1268,16 +1265,16 @@ EVAL:
     case P_GTE:
       break;
     case P_ADD:
-      res = arithop(A, args, env, '+');
+      res = arith_add(A, args, env);
       break;
     case P_SUB:
-      res = arithop(A, args, env, '-');
+      res = arith_sub(A, args, env);
       break;
     case P_MUL:
-      res = arithop(A, args, env, '*');
+      res = arith_mul(A, args, env);
       break;
     case P_DIV:
-      res = arithop(A, args, env, '/');
+      res = arith_div(A, args, env);
       break;
     default:
       ape_error(A, "undefined primitive");
