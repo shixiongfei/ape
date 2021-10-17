@@ -164,6 +164,7 @@ struct ape_State {
 
 #define integer(x) ((x)->cdr.d)
 #define number(x) ((x)->cdr.n)
+#define digits(x) (type(x) == APE_TNUMBER ? number(x) : integer(x))
 #define prim(x) ((x)->cdr.c)
 #define cfunc(x) ((x)->cdr.f)
 
@@ -996,7 +997,7 @@ static ape_Object *arith_addfloat(ape_State *A, ape_Object *args,
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
 
-    res += type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+    res += digits(x);
   }
 
   return ape_number(A, res);
@@ -1022,7 +1023,7 @@ static ape_Object *arith_subfloat(ape_State *A, ape_Object *args,
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
 
-    res -= type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+    res -= digits(x);
   }
 
   return ape_number(A, res);
@@ -1063,7 +1064,7 @@ static ape_Object *arith_mulfloat(ape_State *A, ape_Object *args,
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
 
-    res *= type(x) == APE_TNUMBER ? number(x) : (ape_Number)integer(x);
+    res *= digits(x);
   }
 
   return ape_number(A, res);
@@ -1101,7 +1102,7 @@ static ape_Object *arith_divfloat(ape_State *A, ape_Object *args,
   while (!isnil(args)) {
     ape_Object *x = check_divzero(A, evalarg());
 
-    res /= type(x) == APE_TNUMBER ? number(x) : integer(x);
+    res /= digits(x);
   }
 
   return ape_number(A, res);
@@ -1116,10 +1117,8 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
 
   x = check_divzero(A, evalarg());
 
-  if (isnil(args)) {
-    ape_Number r = 1.0 / (type(x) == APE_TNUMBER ? number(x) : integer(x));
-    return ape_number(A, r);
-  }
+  if (isnil(args))
+    return ape_number(A, (ape_Number)1 / digits(x));
 
   if (type(x) == APE_TNUMBER)
     return arith_divfloat(A, args, env, number(x));
@@ -1140,6 +1139,29 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
 
   return ape_integer(A, res);
 }
+
+#define arith_compare(A, args, env, op)                                        \
+  do {                                                                         \
+    res = NULL;                                                                \
+    if (isnil(args))                                                           \
+      res = A->t;                                                              \
+    else {                                                                     \
+      va = check_arith(A, evalarg());                                          \
+      if (isnil(args))                                                         \
+        res = A->t;                                                            \
+      else {                                                                   \
+        while (!isnil(args)) {                                                 \
+          vb = check_arith(A, evalarg());                                      \
+          if (!(digits(va) op(digits(vb)))) {                                  \
+            res = &nil;                                                        \
+            break;                                                             \
+          }                                                                    \
+        }                                                                      \
+        if (!res)                                                              \
+          res = A->t;                                                          \
+      }                                                                        \
+    }                                                                          \
+  } while (0)
 
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
@@ -1257,12 +1279,16 @@ EVAL:
       res = ape_bool(A, equal(va, evalarg()));
       break;
     case P_LT:
+      arith_compare(A, args, env, <);
       break;
     case P_LTE:
+      arith_compare(A, args, env, <=);
       break;
     case P_GT:
+      arith_compare(A, args, env, >);
       break;
     case P_GTE:
+      arith_compare(A, args, env, >=);
       break;
     case P_ADD:
       res = arith_add(A, args, env);
