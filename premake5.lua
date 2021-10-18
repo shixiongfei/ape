@@ -36,7 +36,6 @@ solution ( "ape" )
   kind ( "StaticLib" )
   language ( "C" )
   files { "./include/*.h", "./src/*.h", "./src/*.c" }
-  excludes { "./src/main.c" }
   includedirs { "./include" }
   defines { "_UNICODE" }
   staticruntime "On"
@@ -75,7 +74,7 @@ solution ( "ape" )
   kind ( "ConsoleApp" )
   language ( "C" )
   targetname ("ape")
-  files { "./src/main.c" }
+  files { "./*.c" }
   defines { "_UNICODE" }
   includedirs { "./include" }
   libdirs { "./lib" }
