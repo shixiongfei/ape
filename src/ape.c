@@ -304,6 +304,8 @@ static ape_Object *alloc(ape_State *A) {
   return obj;
 }
 
+extern void stdlib_open(ape_State *A);
+
 static ape_State *ape_init(ape_State *A) {
   int i, top = ape_savegc(A);
 
@@ -325,6 +327,7 @@ static ape_State *ape_init(ape_State *A) {
     ape_restoregc(A, top);
   }
 
+  stdlib_open(A);
   return A;
 }
 
@@ -644,7 +647,7 @@ typedef struct {
 } CharPtrInt;
 
 static void writebuf(ape_State *A, void *udata, char ch) {
-  CharPtrInt *x = udata;
+  CharPtrInt *x = (CharPtrInt *)udata;
 
   unused(A);
 
@@ -1410,6 +1413,27 @@ static char readfp(ape_State *A, void *udata) {
   int ch = fgetc((FILE *)udata);
   unused(A);
   return ch == EOF ? '\0' : ch;
+}
+
+static char readbuffer(ape_State *A, void *udata) {
+  CharPtrInt *x = (CharPtrInt *)udata;
+  int ch = '\0';
+
+  if (x->n) {
+    ch = *x->p++;
+    x->n--;
+  }
+
+  return ch;
+}
+
+ape_Object *ape_readstring(ape_State *A, const char *str) {
+  CharPtrInt x;
+
+  x.p = (char *)str;
+  x.n = (int)strlen(str);
+
+  return ape_read(A, readbuffer, &x);
 }
 
 ape_Object *ape_readfp(ape_State *A, FILE *fp) {
