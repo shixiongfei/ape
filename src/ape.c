@@ -19,7 +19,7 @@
 enum {
   P_DEF,
   P_SET,
-  P_COND,
+  P_IF,
   P_FN,
   P_MACRO,
   P_QUOTE,
@@ -49,7 +49,7 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",      "set!", "cond",   "fn",   "macro", "quote", "and",
+    "def",      "set!", "if",   "fn",   "macro", "quote", "and",
     "or",       "not",  "do",     "cons", "car",   "cdr",   "set-car!",
     "set-cdr!", "list", "length", "type", "print", "=",     "<",
     "<=",       ">",    ">=",     "+",    "-",     "*",     "/",
@@ -1241,20 +1241,15 @@ EVAL:
       va = checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
       res = ape_set(A, va, evalarg(), env);
       break;
-    case P_COND:
-      while (!isnil(args)) {
-        va = evalarg();
+    case P_IF:
+      va = evalarg();
+      vb = ape_nextarg(A, &args);
 
-        if (!isnil(va)) {
-          res = isnil(args) ? va : evalarg();
-          break;
-        }
+      expr = !isnil(va) ? vb : ape_nextarg(A, &args);
 
-        if (isnil(args))
-          break;
-
-        args = cdr(args);
-      }
+      ape_restoregc(A, gctop);
+      A->calllist = cdr(&cl);
+      goto EVAL;
       break;
     case P_FN:
     case P_MACRO:

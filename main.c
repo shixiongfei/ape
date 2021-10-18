@@ -28,8 +28,6 @@ int main(int argc, char *argv[]) {
   ape_Object *expr;
   int gctop;
 
-  printf("Ape v%s\n\n", APE_VERSION);
-
   /* init input file */
   if (argc > 1) {
     fp = fopen(argv[1], "rb");
@@ -38,8 +36,11 @@ int main(int argc, char *argv[]) {
       ape_error(A, "could not open input file");
   }
 
-  if (fp == stdin)
+  if (fp == stdin) {
     ape_handlers(A)->error = on_error;
+
+    printf("Ape v%s\n\n", APE_VERSION);
+  }
 
   gctop = ape_savegc(A);
   setjmp(toplevel);
