@@ -19,16 +19,24 @@ static const char defn[] = {"                                                  \
 (defmacro defn (name args . body)                                              \
   (list 'def name (cons 'fn (cons args body))))"};
 
+static const char cadr[] = {"(defn cadr (lst) (car (cdr lst)))"};
+static const char cddr[] = {"(defn cddr (lst) (cdr (cdr lst)))"};
+static const char caddr[] = {"(defn caddr (lst) (car (cddr lst)))"};
+static const char cdddr[] = {"(defn cdddr (lst) (cdr (cddr lst)))"};
+static const char cadddr[] = {"(defn cadddr (lst) (car (cdddr lst)))"};
+static const char cddddr[] = {"(defn cddddr (lst) (cdr (cdddr lst)))"};
+
 static const char cond[] = {"                                                  \
 (defmacro cond clauses                                                         \
-  (if (cdr clauses)                                                            \
-      (list 'if (car clauses)                                                  \
-                (car (cdr clauses))                                            \
-               (apply cond (cdr (cdr clauses))))                               \
-    (car clauses)))"};
+  (list 'if (car clauses)                                                      \
+            (cadr clauses)                                                     \
+          (if (not (cdddr clauses))                                            \
+              (caddr clauses)                                                  \
+            (cons 'cond (cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
-  const char *stdlib[] = {defmacro, defn, cond, NULL};
+  const char *stdlib[] = {defmacro, defn,   cadr,   cddr, caddr,
+                          cdddr,    cadddr, cddddr, cond, NULL};
   int gctop = ape_savegc(A);
 
   for (const char **lib = stdlib; *lib; lib++) {

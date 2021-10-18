@@ -22,7 +22,6 @@ enum {
   P_IF,
   P_FN,
   P_MACRO,
-  P_APPLY,
   P_QUOTE,
   P_AND,
   P_OR,
@@ -50,10 +49,10 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",  "set!",   "if",   "fn",    "macro", "apply", "quote",    "and",
-    "or",   "not",    "do",   "cons",  "car",   "cdr",   "set-car!", "set-cdr!",
-    "list", "length", "type", "print", "=",     "<",     "<=",       ">",
-    ">=",   "+",      "-",    "*",     "/",
+    "def",      "set!", "if",     "fn",   "macro", "quote", "and",
+    "or",       "not",  "do",     "cons", "car",   "cdr",   "set-car!",
+    "set-cdr!", "list", "length", "type", "print", "=",     "<",
+    "<=",       ">",    ">=",     "+",    "-",     "*",     "/",
 };
 
 static const char *typenames[] = {
@@ -1226,6 +1225,7 @@ EVAL:
   A->calllist = &cl;
 
   gctop = ape_savegc(A);
+  ape_pushgc(A, env);
 
   fn = eval(A, car(expr), env);
   args = cdr(expr);
@@ -1259,11 +1259,6 @@ EVAL:
       res = alloc(A);
       settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
       cdr(res) = ape_cons(A, va, vb);
-      break;
-    case P_APPLY:
-      va = evalarg();
-      vb = evalarg();
-      res = eval(A, ape_cons(A, va, vb), env);
       break;
     case P_QUOTE:
       res = ape_nextarg(A, &args);
