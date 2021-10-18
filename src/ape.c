@@ -1367,9 +1367,10 @@ EVAL:
     va = cdr(fn); /* ((env . args) . (do ...)) */
     vb = car(va); /* (env . args)*/
 
+    args = eval_list(A, args, env);
+
     /* new local environment */
     env = ape_cons(A, &nil, car(vb));
-    args = eval_list(A, args, env);
     args_binds(A, cdr(vb), args, env);
 
     expr = cdr(va); /* do block */
