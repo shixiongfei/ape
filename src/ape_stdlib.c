@@ -11,12 +11,16 @@
 
 #include "ape.h"
 
-static const char defn[] = {"\
-(def defn (macro (name args . body) \
-  (list 'def name (cons 'fn (cons args body))))) "};
+static const char defmacro[] = {" \
+(def defmacro (macro (name args . body) \
+  (list 'def name (cons 'macro (cons args body)))))"};
+
+static const char defn[] = {" \
+(defmacro defn (name args . body) \
+  (list 'def name (cons 'fn (cons args body))))"};
 
 void stdlib_open(ape_State *A) {
-  const char *stdlib[] = {defn, NULL};
+  const char *stdlib[] = {defmacro, defn, NULL};
   int gctop = ape_savegc(A);
 
   for (const char **lib = stdlib; *lib; lib++) {
