@@ -9,9 +9,10 @@
  * https://github.com/shixiongfei/ape
  */
 
-#include "ape.h"
 #include <setjmp.h>
 #include <stdio.h>
+
+#include "ape.h"
 
 static long prompt = 0;
 static jmp_buf toplevel;

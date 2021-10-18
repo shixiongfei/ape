@@ -9,11 +9,12 @@
  * https://github.com/shixiongfei/ape
  */
 
-#include "ape.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "ape.h"
 
 enum {
   P_DEF,
@@ -253,9 +254,9 @@ static void collect_garbage(ape_State *A) {
   int i;
 
   /* mark */
-  for (i = 0; i < A->gcstack_idx; i++) {
+  for (i = 0; i < A->gcstack_idx; i++)
     ape_mark(A, A->gcstack[i]);
-  }
+
   ape_mark(A, A->symlist);
   ape_mark(A, A->env);
 
@@ -1016,7 +1017,6 @@ static ape_Object *arith_addfloat(ape_State *A, ape_Object *args,
                                   ape_Object *env, ape_Number res) {
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
-
     res += digits(x);
   }
 
@@ -1042,7 +1042,6 @@ static ape_Object *arith_subfloat(ape_State *A, ape_Object *args,
                                   ape_Object *env, ape_Number res) {
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
-
     res -= digits(x);
   }
 
@@ -1083,7 +1082,6 @@ static ape_Object *arith_mulfloat(ape_State *A, ape_Object *args,
                                   ape_Object *env, ape_Number res) {
   while (!isnil(args)) {
     ape_Object *x = check_arith(A, evalarg());
-
     res *= digits(x);
   }
 
@@ -1121,7 +1119,6 @@ static ape_Object *arith_divfloat(ape_State *A, ape_Object *args,
                                   ape_Object *env, ape_Number res) {
   while (!isnil(args)) {
     ape_Object *x = check_divzero(A, evalarg());
-
     res /= digits(x);
   }
 
