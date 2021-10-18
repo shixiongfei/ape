@@ -1204,7 +1204,7 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
-  ape_Object *res, *va, *vb; /* registers */
+  ape_Object *res, *va, *vb, *vc; /* registers */
   int gctop;
 
 EVAL:
@@ -1384,11 +1384,10 @@ EVAL:
     vb = car(va); /* (env . args)*/
 
     /* arguments environment */
-    env = ape_cons(A, &nil, car(vb));
-    args_binds(A, cdr(vb), args, env);
+    vc = ape_cons(A, &nil, car(vb));
+    args_binds(A, cdr(vb), args, vc);
 
-    expr = eval(A, cdr(va), env); /* generate code by macro */
-    env = cdr(env);               /* restore environment */
+    expr = eval(A, cdr(va), vc); /* generate code by macro */
 
     ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
