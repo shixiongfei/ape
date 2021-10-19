@@ -32,10 +32,7 @@ enum {
   P_CDR,
   P_SETCAR,
   P_SETCDR,
-  P_LIST,
-  P_LENGTH,
   P_TYPE,
-  P_PRINT,
   P_EQ,
   P_LT,
   P_LTE,
@@ -49,10 +46,9 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",      "set!", "if",     "fn",   "macro", "quote", "and",
-    "or",       "not",  "do",     "cons", "car",   "cdr",   "set-car!",
-    "set-cdr!", "list", "length", "type", "print", "=",     "<",
-    "<=",       ">",    ">=",     "+",    "-",     "*",     "/",
+    "def", "set!", "if",  "fn",  "macro",    "quote",    "and",  "or", "not",
+    "do",  "cons", "car", "cdr", "set-car!", "set-cdr!", "type", "=",  "<",
+    "<=",  ">",    ">=",  "+",   "-",        "*",        "/",
 };
 
 static const char *typenames[] = {
@@ -1304,24 +1300,9 @@ EVAL:
       va = evalarg();
       res = ape_setcdr(A, va, evalarg());
       break;
-    case P_LIST:
-      res = eval_list(A, args, env);
-      break;
-    case P_LENGTH:
-      res = ape_integer(A, ape_length(A, evalarg()));
-      break;
     case P_TYPE:
       va = evalarg();
       res = ape_symbol(A, typenames[type(va)]);
-      break;
-    case P_PRINT:
-      while (!isnil(args)) {
-        ape_writefp(A, evalarg(), stdout);
-
-        if (!isnil(args))
-          printf(" ");
-      }
-      printf("\n");
       break;
     case P_EQ:
       va = evalarg();

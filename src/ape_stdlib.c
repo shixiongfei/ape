@@ -43,6 +43,23 @@ static ape_Object *cddddr(ape_State *A, ape_Object *args) {
   return ape_cdr(A, cdddr(A, args));
 }
 
+static ape_Object *list(ape_State *A, ape_Object *args) { return args; }
+
+static ape_Object *length(ape_State *A, ape_Object *args) {
+  return ape_integer(A, ape_length(A, ape_nextarg(A, &args)));
+}
+
+static ape_Object *print(ape_State *A, ape_Object *args) {
+  while (!ape_isnil(A, args)) {
+    ape_writefp(A, ape_nextarg(A, &args), stdout);
+
+    if (!ape_isnil(A, args))
+      printf(" ");
+  }
+  printf("\n");
+  return ape_nil(A);
+}
+
 static const char defmacro[] = {"                                              \
 (def defmacro (macro (name args . body)                                        \
   (list 'def name (cons 'macro (cons args body)))))"};
@@ -60,9 +77,9 @@ static const char cond[] = {"                                                  \
             (cons 'cond (cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
-  const Function cfuncs[] = {CFUNC(cadr),  CFUNC(cddr),   CFUNC(caddr),
-                             CFUNC(cdddr), CFUNC(cadddr), CFUNC(cddddr),
-                             {NULL, NULL}};
+  const Function cfuncs[] = {
+      CFUNC(cadr),   CFUNC(cddr), CFUNC(caddr),  CFUNC(cdddr), CFUNC(cadddr),
+      CFUNC(cddddr), CFUNC(list), CFUNC(length), CFUNC(print), {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, cond, NULL};
   int gctop = ape_savegc(A);
 
