@@ -16,6 +16,9 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
+#define CFUNC(fn)                                                              \
+  { APE_STR(fn), fn }
+
 static ape_Object *cadr(ape_State *A, ape_Object *args) {
   return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
@@ -57,9 +60,8 @@ static const char cond[] = {"                                                  \
             (cons 'cond (cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
-  const Function cfuncs[] = {{"cadr", cadr},     {"cddr", cddr},
-                             {"caddr", caddr},   {"cdddr", cdddr},
-                             {"cadddr", cadddr}, {"cddddr", cddddr},
+  const Function cfuncs[] = {CFUNC(cadr),  CFUNC(cddr),   CFUNC(caddr),
+                             CFUNC(cdddr), CFUNC(cadddr), CFUNC(cddddr),
                              {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, cond, NULL};
   int gctop = ape_savegc(A);
