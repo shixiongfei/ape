@@ -11,6 +11,35 @@
 
 #include "ape.h"
 
+typedef struct Function {
+  const char *name;
+  ape_CFunc func;
+} Function;
+
+static ape_Object *cadr(ape_State *A, ape_Object *args) {
+  return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
+}
+
+static ape_Object *cddr(ape_State *A, ape_Object *args) {
+  return ape_cdr(A, ape_cdr(A, ape_nextarg(A, &args)));
+}
+
+static ape_Object *caddr(ape_State *A, ape_Object *args) {
+  return ape_car(A, cddr(A, args));
+}
+
+static ape_Object *cdddr(ape_State *A, ape_Object *args) {
+  return ape_cdr(A, cddr(A, args));
+}
+
+static ape_Object *cadddr(ape_State *A, ape_Object *args) {
+  return ape_car(A, cdddr(A, args));
+}
+
+static ape_Object *cddddr(ape_State *A, ape_Object *args) {
+  return ape_cdr(A, cdddr(A, args));
+}
+
 static const char defmacro[] = {"                                              \
 (def defmacro (macro (name args . body)                                        \
   (list 'def name (cons 'macro (cons args body)))))"};
@@ -18,13 +47,6 @@ static const char defmacro[] = {"                                              \
 static const char defn[] = {"                                                  \
 (defmacro defn (name args . body)                                              \
   (list 'def name (cons 'fn (cons args body))))"};
-
-static const char cadr[] = {"(defn cadr (lst) (car (cdr lst)))"};
-static const char cddr[] = {"(defn cddr (lst) (cdr (cdr lst)))"};
-static const char caddr[] = {"(defn caddr (lst) (car (cddr lst)))"};
-static const char cdddr[] = {"(defn cdddr (lst) (cdr (cddr lst)))"};
-static const char cadddr[] = {"(defn cadddr (lst) (car (cdddr lst)))"};
-static const char cddddr[] = {"(defn cddddr (lst) (cdr (cdddr lst)))"};
 
 static const char cond[] = {"                                                  \
 (defmacro cond clauses                                                         \
@@ -35,14 +57,23 @@ static const char cond[] = {"                                                  \
             (cons 'cond (cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
-  const char *stdlib[] = {defmacro, defn,   cadr,   cddr, caddr,
-                          cdddr,    cadddr, cddddr, cond, NULL};
+  const Function cfuncs[] = {{"cadr", cadr},     {"cddr", cddr},
+                             {"caddr", caddr},   {"cdddr", cdddr},
+                             {"cadddr", cadddr}, {"cddddr", cddddr},
+                             {NULL, NULL}};
+  const char *stdlib[] = {defmacro, defn, cond, NULL};
   int gctop = ape_savegc(A);
 
-  for (const char **lib = stdlib; *lib; lib++) {
+  /* c libs */
+  for (const Function *func = cfuncs; func->name && func->func; ++func) {
+    ape_def(A, ape_symbol(A, func->name), ape_cfunc(A, func->func), NULL);
+    ape_restoregc(A, gctop);
+  }
+
+  /* ape libs */
+  for (const char **lib = stdlib; *lib; ++lib) {
     ape_Object *expr = ape_readstring(A, *lib);
     ape_eval(A, expr);
-
     ape_restoregc(A, gctop);
   }
 }
