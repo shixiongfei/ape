@@ -1,0 +1,79 @@
+;; test.ape
+;;
+;; Copyright (c) 2021 Xiongfei Shi
+;;
+;; Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
+;; License: Apache-2.0
+;;
+;; https://github.com/shixiongfei/ape
+;;
+
+(print (length '(1 2 3 4 5)))
+
+(print (length "Hello, World!"))
+
+(print (car '(1 2 3 4 5)))
+(print (cdr '(1 2 3 4 5)))
+
+(print (do (cons 1 2)))
+
+(print (+ 1 2 3 4 5))
+(print (- 10 4 3 2))
+(print (* 2 3 4 5 6))
+(print (/ 10 4 3 2))
+
+(print (type (/ 10 3)))
+(print (type (/ 10 2)))
+
+(def x 100)
+(print "x =" x)
+
+(set! x 150)
+(print "x =" x)
+
+(defn sum (a b)
+  (+ a b))
+
+(print "sum 2 3 =" (sum 2 3))
+
+
+(defn fib (n)
+  (if (<= 2 n)
+      (+ (fib (- n 1)) (fib (- n 2)))
+    n))
+
+(print "fib 28 =" (fib 28))
+
+
+(defn counter (val step)
+  (fn ()
+    (set! val (+ val step))))
+
+(def count (counter 0 1))
+
+(print "Count" (count))
+(print "Count" (count))
+(print "Count" (count))
+(print "Count" (count))
+(print "Count" (count))
+
+
+(defmacro push (val lst)
+  (list 'set! lst (list 'cons val lst)))
+
+(def items (list "cat" "dog" "fox"))
+
+(push "owl" items)
+(push "cow" items)
+
+(print items)
+
+
+(defn accum (n)
+  (defn iter (acc step)
+    (cond
+      (> step n) acc
+      (iter (+ acc step) (+ step 1))))
+  (iter 0 0))
+
+(print "accum 100 =" (accum 100))
