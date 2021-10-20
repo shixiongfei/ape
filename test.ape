@@ -9,7 +9,6 @@
 ;;
 
 (print (length '(1 2 3 4 5)))
-
 (print (length "Hello, World!"))
 
 (print (car '(1 2 3 4 5)))
@@ -30,6 +29,29 @@
 
 (set! x 150)
 (print "x =" x)
+
+(print (> 1 2))
+(print (>= 1 2))
+(print (> 2 1))
+(print (>= 2 2))
+(print (< 1 2))
+(print (<= 1 2))
+(print (< 2 1))
+(print (<= 2 2))
+
+(print (and 1 2))
+(print (and 1 nil 2))
+(print (or nil 2))
+(print (or 1 2))
+(print (not nil))
+
+(def c (cons 1 2))
+(print "c =" c)
+
+(set-car! c 4)
+(set-cdr! c 5)
+(print "c =" c)
+
 
 (defn sum (a b)
   (+ a b))
