@@ -46,8 +46,9 @@
 
 
 (defn counter (val step)
+  (def count val)
   (fn ()
-    (set! val (+ val step))))
+    (set! count (+ count step))))
 
 (def count (counter 0 1))
 
