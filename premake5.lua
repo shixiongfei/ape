@@ -10,7 +10,7 @@
 
 solution ( "ape" )
   configurations { "Release", "Debug" }
-  platforms { "x64" }
+  platforms { "x64", "x32" }
 
   if _ACTION == "clean" then
     os.rmdir(".vs")

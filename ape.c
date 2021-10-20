@@ -780,7 +780,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       return ape_integer(A, d);
 
     /* try to read as number */
-    n = strtod(buf, &p);
+    n = (ape_Number)strtod(buf, &p);
 
     if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
       return ape_number(A, n);
