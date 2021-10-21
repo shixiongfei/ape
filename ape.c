@@ -511,7 +511,10 @@ ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt) {
 
 ape_Object *ape_true(ape_State *A) { return A->t; }
 
-ape_Object *ape_nil(ape_State *A) { return &nil; }
+ape_Object *ape_nil(ape_State *A) {
+  unused(A);
+  return &nil;
+}
 
 ape_Object *ape_bool(ape_State *A, int b) {
   return b ? ape_true(A) : ape_nil(A);
@@ -1195,8 +1198,7 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
   }
 }
 
-static ape_Object *set_place(ape_State *A, ape_Object *expr, ape_Object *val,
-                             ape_Object *env) {
+static ape_Object **place(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args, *res;
 
   expr = checktype(A, expr, APE_TPAIR);
@@ -1205,12 +1207,21 @@ static ape_Object *set_place(ape_State *A, ape_Object *expr, ape_Object *val,
   res = checktype(A, evalarg(), APE_TPAIR);
 
   if (fn == eval(A, ape_symbol(A, "car"), env))
-    car(res) = val;
+    return &car(res);
   else if (fn == eval(A, ape_symbol(A, "cdr"), env))
-    cdr(res) = val;
-  else
+    return &cdr(res);
+
+  return NULL;
+}
+
+static ape_Object *set_place(ape_State *A, ape_Object *expr, ape_Object *val,
+                             ape_Object *env) {
+  ape_Object **loc = place(A, expr, env);
+
+  if (!loc)
     ape_error(A, "illegal place");
 
+  *loc = val;
   return val;
 }
 
@@ -1406,6 +1417,8 @@ static char readfp(ape_State *A, void *udata) {
 static char readbuffer(ape_State *A, void *udata) {
   CharPtrInt *x = (CharPtrInt *)udata;
   int ch = '\0';
+
+  unused(A);
 
   if (x->n) {
     ch = *x->p++;
