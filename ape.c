@@ -30,6 +30,8 @@ enum {
   P_CONS,
   P_CAR,
   P_CDR,
+  P_SETCAR,
+  P_SETCDR,
   P_TYPE,
   P_EQ,
   P_LT,
@@ -44,9 +46,9 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def", "set!", "if",   "fn",  "macro", "quote", "and", "or",
-    "not", "do",   "cons", "car", "cdr",   "type",  "=",   "<",
-    "<=",  ">",    ">=",   "+",   "-",     "*",     "/",
+    "def", "set!", "if",  "fn",  "macro",    "quote",    "and",  "or", "not",
+    "do",  "cons", "car", "cdr", "set-car!", "set-cdr!", "type", "=",  "<",
+    "<=",  ">",    ">=",  "+",   "-",        "*",        "/",
 };
 
 static const char *typenames[] = {
@@ -1198,33 +1200,6 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
   }
 }
 
-static ape_Object **place(ape_State *A, ape_Object *expr, ape_Object *env) {
-  ape_Object *fn, *args, *res;
-
-  expr = checktype(A, expr, APE_TPAIR);
-  fn = eval(A, car(expr), env);
-  args = cdr(expr);
-  res = checktype(A, evalarg(), APE_TPAIR);
-
-  if (fn == eval(A, ape_symbol(A, "car"), env))
-    return &car(res);
-  else if (fn == eval(A, ape_symbol(A, "cdr"), env))
-    return &cdr(res);
-
-  return NULL;
-}
-
-static ape_Object *set_place(ape_State *A, ape_Object *expr, ape_Object *val,
-                             ape_Object *env) {
-  ape_Object **loc = place(A, expr, env);
-
-  if (!loc)
-    ape_error(A, "illegal place");
-
-  *loc = val;
-  return val;
-}
-
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
@@ -1263,10 +1238,8 @@ EVAL:
       res = ape_def(A, va, evalarg(), env);
       break;
     case P_SET:
-      va = ape_nextarg(A, &args);
-      vb = evalarg();
-      res = type(va) == APE_TSYMBOL ? ape_set(A, va, vb, env)
-                                    : set_place(A, va, vb, env);
+      va = checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      res = ape_set(A, va, evalarg(), env);
       break;
     case P_IF:
       va = evalarg();
@@ -1321,6 +1294,14 @@ EVAL:
       break;
     case P_CDR:
       res = ape_cdr(A, evalarg());
+      break;
+    case P_SETCAR:
+      va = evalarg();
+      res = ape_setcar(A, va, evalarg());
+      break;
+    case P_SETCDR:
+      va = evalarg();
+      res = ape_setcdr(A, va, evalarg());
       break;
     case P_TYPE:
       va = evalarg();

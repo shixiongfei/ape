@@ -48,8 +48,8 @@
 (def c (cons 1 2))
 (print "c =" c)
 
-(set! (car c) 4)
-(set! (cdr c) 5)
+(set-car! c 4)
+(set-cdr! c 5)
 (print "c =" c)
 
 
