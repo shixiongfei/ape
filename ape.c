@@ -23,6 +23,7 @@ enum {
   P_FN,
   P_MACRO,
   P_QUOTE,
+  P_QUASIQUOTE,
   P_AND,
   P_OR,
   P_NOT,
@@ -46,9 +47,10 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def", "set!", "if",  "fn",  "macro",    "quote",    "and",  "or", "not",
-    "do",  "cons", "car", "cdr", "set-car!", "set-cdr!", "type", "=",  "<",
-    "<=",  ">",    ">=",  "+",   "-",        "*",        "/",
+    "def",      "set!",     "if",   "fn", "macro", "quote", "quasiquote",
+    "and",      "or",       "not",  "do", "cons",  "car",   "cdr",
+    "set-car!", "set-cdr!", "type", "=",  "<",     "<=",    ">",
+    ">=",       "+",        "-",    "*",  "/",
 };
 
 static const char *typenames[] = {
@@ -736,6 +738,35 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     /* Transform: '(...) => (quote (...)) */
     return ape_cons(A, ape_symbol(A, "quote"), ape_cons(A, v, &nil));
 
+  case '`':
+    v = ape_read(A, fn, udata);
+
+    if (!v)
+      ape_error(A, "stray '`'");
+
+    /* Transform: `(...) => (quasiquote (...)) */
+    return ape_cons(A, ape_symbol(A, "quasiquote"), ape_cons(A, v, &nil));
+
+  case ',':
+    ch = fn(A, udata);
+
+    if (ch != '@')
+      A->next_char = ch;
+
+    v = ape_read(A, fn, udata);
+
+    if (!v)
+      ape_error(A, "stray ','");
+
+    res = ape_cons(A, v, &nil);
+
+    /* Transform: ,@v => (unquote-splicing v) */
+    if (ch == '@')
+      return ape_cons(A, ape_symbol(A, "unquote-splicing"), res);
+
+    /* Transform: ,v => (unquote v) */
+    return ape_cons(A, ape_symbol(A, "unquote"), res);
+
   case '"':
     res = build_string(A, NULL, 0);
     v = res;
@@ -1200,6 +1231,52 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
   }
 }
 
+static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
+  ape_Object *unquote = ape_symbol(A, "unquote");
+  ape_Object *unquote_splicing = ape_symbol(A, "unquote-splicing");
+  ape_Object *res = &nil;
+  ape_Object **tail = &res;
+
+  if (type(expr) != APE_TPAIR)
+    return expr;
+
+  while (!isnil(expr)) {
+    ape_Object *obj = ape_nextarg(A, &expr);
+
+    if (type(obj) == APE_TPAIR) {
+      ape_Object *fn = car(obj);
+      ape_Object *args = cdr(obj);
+
+      if (fn == unquote_splicing) {
+        obj = checktype(A, eval(A, ape_nextarg(A, &args), env), APE_TPAIR);
+
+        for (; !isnil(obj); obj = cdr(obj)) {
+          /* (x . y) => (x y) */
+          if (type(obj) != APE_TPAIR) {
+            *tail = ape_cons(A, obj, &nil);
+            tail = &cdr(*tail);
+            break;
+          }
+
+          /* copy list */
+          *tail = ape_cons(A, car(obj), &nil);
+          tail = &cdr(*tail);
+        }
+
+        continue;
+      } else if (fn == unquote)
+        obj = eval(A, ape_nextarg(A, &args), env);
+      else
+        obj = quasiquote(A, obj, env);
+    }
+
+    *tail = ape_cons(A, obj, &nil);
+    tail = &cdr(*tail);
+  }
+
+  return res;
+}
+
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
@@ -1261,6 +1338,9 @@ EVAL:
       break;
     case P_QUOTE:
       res = ape_nextarg(A, &args);
+      break;
+    case P_QUASIQUOTE:
+      res = quasiquote(A, ape_nextarg(A, &args), env);
       break;
     case P_AND:
       while (!isnil(args) && !isnil(res = evalarg()))

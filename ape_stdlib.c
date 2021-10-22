@@ -60,26 +60,45 @@ static ape_Object *print(ape_State *A, ape_Object *args) {
   return ape_nil(A);
 }
 
+static ape_Object *unquote(ape_State *A, ape_Object *args) {
+  ape_error(A, "unquote outside a quasiquote");
+  return ape_nil(A);
+}
+
+static ape_Object *unquote_splicing(ape_State *A, ape_Object *args) {
+  ape_error(A, "unquote-splicing outside a quasiquote");
+  return ape_nil(A);
+}
+
 static const char defmacro[] = {"                                              \
 (def defmacro (macro (name args . body)                                        \
-  (list 'def name (cons 'macro (cons args body)))))"};
+  `(def ,name (macro ,args ,@body))))"};
 
 static const char defn[] = {"                                                  \
 (defmacro defn (name args . body)                                              \
-  (list 'def name (cons 'fn (cons args body))))"};
+  `(def ,name (fn ,args ,@body)))"};
 
 static const char cond[] = {"                                                  \
 (defmacro cond clauses                                                         \
-  (list 'if (car clauses)                                                      \
-            (cadr clauses)                                                     \
-          (if (not (cdddr clauses))                                            \
-              (caddr clauses)                                                  \
-            (cons 'cond (cddr clauses)))))"};
+  `(if ,(car clauses)                                                          \
+       ,(cadr clauses)                                                         \
+     ,(if (not (cdddr clauses))                                                \
+          (caddr clauses)                                                      \
+        (cons 'cond (cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
-  const Function cfuncs[] = {
-      CFUNC(cadr),   CFUNC(cddr), CFUNC(caddr),  CFUNC(cdddr), CFUNC(cadddr),
-      CFUNC(cddddr), CFUNC(list), CFUNC(length), CFUNC(print), {NULL, NULL}};
+  const Function cfuncs[] = {CFUNC(cadr),
+                             CFUNC(cddr),
+                             CFUNC(caddr),
+                             CFUNC(cdddr),
+                             CFUNC(cadddr),
+                             CFUNC(cddddr),
+                             CFUNC(list),
+                             CFUNC(length),
+                             CFUNC(print),
+                             CFUNC(unquote),
+                             {"unquote-splicing", unquote_splicing},
+                             {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, cond, NULL};
   int gctop = ape_savegc(A);
 

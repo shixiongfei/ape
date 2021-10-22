@@ -82,7 +82,7 @@
 
 
 (defmacro push (val lst)
-  (list 'set! lst (list 'cons val lst)))
+  `(set! ,lst (cons ,val ,lst)))
 
 (def items (list "cat" "dog" "fox"))
 
