@@ -119,3 +119,24 @@
 (while (> x 0)
   (print "x =" x)
   (set! x (- x 1)))
+
+
+(print "global x =" x)
+
+(print "let =" (let (x (set! x (+ x 1))
+                     y 8)
+                 (+ x y)))
+
+(print "global x =" x)
+
+
+(for x items
+  (print ">" x))
+
+(print items)
+
+(for x (list 1 2 3 4 5)
+  (print x))
+
+(for x '(a b c d e)
+  (print x))

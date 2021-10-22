@@ -87,6 +87,19 @@ static const char defn[] = {"                                                  \
 (defmacro defn (name args . body)                                              \
   `(def ,name (fn ,args ,@body)))"};
 
+static const char let[] = {"                                                   \
+(defmacro let (binds . body)                                                   \
+  ((fn ()                                                                      \
+     (def args nil)                                                            \
+     (def vals nil)                                                            \
+     (while binds                                                              \
+       (set! args (cons (car binds) args))                                     \
+       (set! vals (cons (cadr binds) vals))                                    \
+       (set! binds (cddr binds)))                                              \
+     `((fn ,(reverse args)                                                     \
+         ,@body)                                                               \
+       ,@(reverse vals)))))"};
+
 static const char cond[] = {"                                                  \
 (defmacro cond clauses                                                         \
   `(if ,(car clauses)                                                          \
@@ -109,6 +122,15 @@ static const char while_[] = {"                                                \
      ,@body                                                                    \
      (while ,test ,@body)))"};
 
+static const char for_[] = {"                                                  \
+(defmacro for (item list . body)                                                \
+  (let (iter (gensym))                                                         \
+    `(let (,iter ,list)                                                         \
+       (while ,iter                                                            \
+         (let (,item (car ,iter))                                              \
+           (set! ,iter (cdr ,iter))                                            \
+           ,@body)))))"};
+
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {{"cadr", cadr},
                              {"cddr", cddr},
@@ -125,7 +147,8 @@ void stdlib_open(ape_State *A) {
                              {"unquote-splicing", unquote_splicing},
                              {"gensym", gensym},
                              {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn, cond, when, unless, while_, NULL};
+  const char *stdlib[] = {defmacro, defn,   let,  cond, when,
+                          unless,   while_, for_, NULL};
   int gctop = ape_savegc(A);
 
   /* c libs */
