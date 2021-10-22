@@ -645,6 +645,15 @@ ape_Object *ape_gensym(ape_State *A) {
   return ape_symbol(A, gensym);
 }
 
+ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
+  ape_Object *res = &nil;
+
+  for (obj = checktype(A, obj, APE_TPAIR); !isnil(obj); obj = cdr(obj))
+    res = ape_cons(A, car(obj), res);
+
+  return res;
+}
+
 ape_Integer ape_tointeger(ape_State *A, ape_Object *obj) {
   return integer(checktype(A, obj, APE_TINTEGER));
 }
