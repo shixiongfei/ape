@@ -84,7 +84,7 @@ static const char cond[] = {"                                                  \
        ,(cadr clauses)                                                         \
      ,(if (not (cdddr clauses))                                                \
           (caddr clauses)                                                      \
-        (cons 'cond (cddr clauses)))))"};
+        `(cond ,@(cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {CFUNC(cadr),
