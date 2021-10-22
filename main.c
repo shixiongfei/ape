@@ -17,8 +17,17 @@
 static long prompt = 0;
 static jmp_buf toplevel;
 
-static void on_error(ape_State *A, const char *msg, ape_Object *call_list) {
-  fprintf(stderr, "error: %s\n", msg);
+static void on_error(ape_State *A, const char *errmsg, ape_Object *calllist) {
+  ape_Object *cl = calllist;
+
+  fprintf(stderr, "error: %s\n", errmsg);
+
+  for (; !ape_isnil(A, cl); cl = ape_cdr(A, cl)) {
+    char buf[64];
+    ape_tostring(A, ape_car(A, cl), buf, sizeof(buf));
+    fprintf(stderr, "=> %s\n", buf);
+  }
+
   longjmp(toplevel, -1);
 }
 
