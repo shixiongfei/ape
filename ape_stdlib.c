@@ -99,6 +99,12 @@ static const char unless[] = {"                                                \
 (defmacro unless (test . body)                                                 \
   `(if (not ,test) (do ,@body) nil))"};
 
+static const char while_[] = {"                                                \
+(defmacro while (test . body)                                                  \
+  `(when ,test                                                                 \
+     ,@body                                                                    \
+     (while ,test ,@body)))"};
+
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
       {"cadr", cadr},       {"cddr", cddr},
@@ -108,7 +114,7 @@ void stdlib_open(ape_State *A) {
       {"length", length},   {"print", print},
       {"unquote", unquote}, {"unquote-splicing", unquote_splicing},
       {"gensym", gensym},   {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn, cond, when, unless, NULL};
+  const char *stdlib[] = {defmacro, defn, cond, when, unless, while_, NULL};
   int gctop = ape_savegc(A);
 
   /* c libs */
