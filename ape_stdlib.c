@@ -61,6 +61,10 @@ static ape_Object *print(ape_State *A, ape_Object *args) {
   return ape_nil(A);
 }
 
+static ape_Object *gensym(ape_State *A, ape_Object *args) {
+  return ape_gensym(A);
+}
+
 static ape_Object *unquote(ape_State *A, ape_Object *args) {
   ape_error(A, "unquote outside a quasiquote");
   return ape_nil(A);
@@ -103,7 +107,7 @@ void stdlib_open(ape_State *A) {
       {"eval", eval},       {"list", list},
       {"length", length},   {"print", print},
       {"unquote", unquote}, {"unquote-splicing", unquote_splicing},
-      {NULL, NULL}};
+      {"gensym", gensym},   {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, cond, when, unless, NULL};
   int gctop = ape_savegc(A);
 

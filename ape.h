@@ -108,6 +108,7 @@ APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
 APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
 APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
 APE_API ape_Object *ape_ptr(ape_State *A, void *ptr);
+APE_API ape_Object *ape_gensym(ape_State *A);
 
 APE_API ape_Integer ape_tointeger(ape_State *A, ape_Object *obj);
 APE_API ape_Number ape_tonumber(ape_State *A, ape_Object *obj);

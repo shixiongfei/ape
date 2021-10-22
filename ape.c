@@ -141,6 +141,7 @@ struct ape_State {
   ape_Object *env;
 
   int next_char;
+  int symid;
 };
 
 #define unused(x) ((void)x)
@@ -306,6 +307,10 @@ extern void stdlib_open(ape_State *A);
 
 static ape_State *ape_init(ape_State *A) {
   int i, top = ape_savegc(A);
+
+  /* init symbol id */
+  A->symid = (uintptr_t)A >> 16; /* random seed */
+  A->symid = ((A->symid * 214013L + 2531011L) >> 16) & 0x01ff;
 
   /* global environment */
   A->env = ape_cons(A, &nil, &nil);
@@ -632,6 +637,12 @@ ape_Object *ape_ptr(ape_State *A, void *ptr) {
   settype(obj, APE_TPTR);
   cdr(obj) = (ape_Object *)ptr;
   return obj;
+}
+
+ape_Object *ape_gensym(ape_State *A) {
+  char gensym[16] = {0};
+  sprintf(gensym, "#:%d", A->symid++);
+  return ape_symbol(A, gensym);
 }
 
 ape_Integer ape_tointeger(ape_State *A, ape_Object *obj) {
