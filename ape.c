@@ -205,7 +205,7 @@ struct ape_State {
 #define stridx(x) ((x)->car.s[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
-static ape_Object nil = {{(void *)(APE_TNIL << 3 | 1)}, {NULL}};
+static ape_Object nil = {{(ape_Object *)(APE_TNIL << 3 | 1)}, {NULL}};
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
   unused(ud);
@@ -628,7 +628,7 @@ ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
 ape_Object *ape_ptr(ape_State *A, void *ptr) {
   ape_Object *obj = alloc(A);
   settype(obj, APE_TPTR);
-  cdr(obj) = ptr;
+  cdr(obj) = (ape_Object *)ptr;
   return obj;
 }
 
