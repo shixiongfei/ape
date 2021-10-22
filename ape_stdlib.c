@@ -123,9 +123,9 @@ static const char while_[] = {"                                                \
      (while ,test ,@body)))"};
 
 static const char for_[] = {"                                                  \
-(defmacro for (item list . body)                                                \
+(defmacro for (item list . body)                                               \
   (let (iter (gensym))                                                         \
-    `(let (,iter ,list)                                                         \
+    `(let (,iter ,list)                                                        \
        (while ,iter                                                            \
          (let (,item (car ,iter))                                              \
            (set! ,iter (cdr ,iter))                                            \
