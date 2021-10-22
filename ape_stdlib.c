@@ -16,9 +16,6 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
-#define CFUNC(fn)                                                              \
-  { APE_STR(fn), fn }
-
 static ape_Object *cadr(ape_State *A, ape_Object *args) {
   return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
@@ -41,6 +38,10 @@ static ape_Object *cadddr(ape_State *A, ape_Object *args) {
 
 static ape_Object *cddddr(ape_State *A, ape_Object *args) {
   return ape_cdr(A, cdddr(A, args));
+}
+
+static ape_Object *eval(ape_State *A, ape_Object *args) {
+  return ape_eval(A, ape_nextarg(A, &args));
 }
 
 static ape_Object *list(ape_State *A, ape_Object *args) { return args; }
@@ -87,18 +88,14 @@ static const char cond[] = {"                                                  \
         `(cond ,@(cddr clauses)))))"};
 
 void stdlib_open(ape_State *A) {
-  const Function cfuncs[] = {CFUNC(cadr),
-                             CFUNC(cddr),
-                             CFUNC(caddr),
-                             CFUNC(cdddr),
-                             CFUNC(cadddr),
-                             CFUNC(cddddr),
-                             CFUNC(list),
-                             CFUNC(length),
-                             CFUNC(print),
-                             CFUNC(unquote),
-                             {"unquote-splicing", unquote_splicing},
-                             {NULL, NULL}};
+  const Function cfuncs[] = {
+      {"cadr", cadr},       {"cddr", cddr},
+      {"caddr", caddr},     {"cdddr", cdddr},
+      {"cadddr", cadddr},   {"cddddr", cddddr},
+      {"eval", eval},       {"list", list},
+      {"length", length},   {"print", print},
+      {"unquote", unquote}, {"unquote-splicing", unquote_splicing},
+      {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, cond, NULL};
   int gctop = ape_savegc(A);
 

@@ -100,3 +100,6 @@
   (iter 0 0))
 
 (print "accum 100 =" (accum 100))
+
+
+(print (eval '(+ 1 2 3 4 5)))
