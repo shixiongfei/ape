@@ -1301,6 +1301,9 @@ EVAL:
   A->calllist = &cl;
 
   gctop = ape_savegc(A);
+
+  /* avoid accidental GC */
+  ape_pushgc(A, expr);
   ape_pushgc(A, env);
 
   fn = eval(A, car(expr), env);
