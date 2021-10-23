@@ -79,6 +79,15 @@ static ape_Object *unquote_splicing(ape_State *A, ape_Object *args) {
   return ape_nil(A);
 }
 
+static ape_Object *rem(ape_State *A, ape_Object *args) {
+  ape_Integer a, b;
+
+  a = ape_tointeger(A, ape_nextarg(A, &args));
+  b = ape_tointeger(A, ape_nextarg(A, &args));
+
+  return ape_integer(A, a % b);
+}
+
 static const char defmacro[] = {"                                              \
 (def defmacro (macro (name args . body)                                        \
   `(def ,name (macro ,args ,@body))))"};
@@ -131,6 +140,27 @@ static const char for_[] = {"                                                  \
            (set! ,iter (cdr ,iter))                                            \
            ,@body)))))"};
 
+static const char map[] = {"                                                   \
+(defn map (proc list)                                                          \
+  (def res nil)                                                                \
+  (for x list                                                                  \
+    (set! res (cons (proc x) res)))                                            \
+  (reverse res))"};
+
+static const char filter[] = {"                                                \
+(defn filter (proc list)                                                       \
+  (def res nil)                                                                \
+  (for x list                                                                  \
+    (when (proc x)                                                             \
+      (set! res (cons x res))))                                                \
+  (reverse res))"};
+
+static const char reduce[] = {"                                                \
+(defn reduce (proc list accum)                                                 \
+  (for x list                                                                  \
+    (set! accum (proc accum x)))                                               \
+  accum)"};
+
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {{"cadr", cadr},
                              {"cddr", cddr},
@@ -146,9 +176,10 @@ void stdlib_open(ape_State *A) {
                              {"unquote", unquote},
                              {"unquote-splicing", unquote_splicing},
                              {"gensym", gensym},
+                             {"rem", rem},
                              {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn,   let,  cond, when,
-                          unless,   while_, for_, NULL};
+  const char *stdlib[] = {defmacro, defn, let, cond,   when,   unless,
+                          while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);
 
   /* c libs */
