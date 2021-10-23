@@ -22,6 +22,7 @@ enum {
   P_IF,
   P_FN,
   P_MACRO,
+  P_EXPAND,
   P_QUOTE,
   P_QUASIQUOTE,
   P_AND,
@@ -47,10 +48,10 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",      "set!",     "if",   "fn", "macro", "quote", "quasiquote",
-    "and",      "or",       "not",  "do", "cons",  "car",   "cdr",
-    "set-car!", "set-cdr!", "type", "=",  "<",     "<=",    ">",
-    ">=",       "+",        "-",    "*",  "/",
+    "def",        "set!",     "if",       "fn",   "macro", "expand", "quote",
+    "quasiquote", "and",      "or",       "not",  "do",    "cons",   "car",
+    "cdr",        "set-car!", "set-cdr!", "type", "=",     "<",      "<=",
+    ">",          ">=",       "+",        "-",    "*",     "/",
 };
 
 static const char *typenames[] = {
@@ -1297,10 +1298,24 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
   return res;
 }
 
+static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
+  ape_Object *va, *vb, *vc;
+
+  va = cdr(macro); /* ((env . args) . (do ...)) */
+  vb = car(va);    /* (env . args)*/
+
+  /* arguments environment */
+  vc = ape_cons(A, &nil, car(vb));
+  args_binds(A, cdr(vb), args, vc);
+
+  /* generate code by macro */
+  return eval(A, cdr(va), vc);
+}
+
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
-  ape_Object *res, *va, *vb, *vc; /* registers */
+  ape_Object *res, *va, *vb; /* registers */
   int gctop;
 
 EVAL:
@@ -1358,6 +1373,11 @@ EVAL:
       res = alloc(A);
       settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
       cdr(res) = ape_cons(A, va, vb);
+      break;
+    case P_EXPAND:
+      va = evalarg();
+      vb = checktype(A, eval(A, car(va), env), APE_TMACRO);
+      res = expand(A, vb, cdr(va));
       break;
     case P_QUOTE:
       res = ape_nextarg(A, &args);
@@ -1463,14 +1483,7 @@ EVAL:
     goto EVAL;
     break;
   case APE_TMACRO:
-    va = cdr(fn); /* ((env . args) . (do ...)) */
-    vb = car(va); /* (env . args)*/
-
-    /* arguments environment */
-    vc = ape_cons(A, &nil, car(vb));
-    args_binds(A, cdr(vb), args, vc);
-
-    expr = eval(A, cdr(va), vc); /* generate code by macro */
+    expr = expand(A, fn, args);
 
     ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
