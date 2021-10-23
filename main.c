@@ -67,10 +67,16 @@ int main(int argc, char *argv[]) {
     if (!expr)
       break;
 
+    if (fp == stdin) {
+      printf("%ld|out> ", prompt);
+      /* Maybe eval will take a long time.
+         Let's display the prompt first. */
+      fflush(stdout);
+    }
+
     expr = ape_eval(A, expr);
 
     if (fp == stdin) {
-      printf("%ld|out> ", prompt);
       ape_writefp(A, expr, stdout);
       printf("\n");
     }
