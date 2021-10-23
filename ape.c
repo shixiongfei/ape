@@ -650,7 +650,7 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
   ape_Object *res = &nil;
 
   for (obj = checktype(A, obj, APE_TPAIR); !isnil(obj); obj = cdr(obj))
-    res = ape_cons(A, car(obj), res);
+    res = ape_cons(A, car(checktype(A, obj, APE_TPAIR)), res);
 
   return res;
 }
