@@ -1299,17 +1299,17 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
 }
 
 static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
-  ape_Object *va, *vb, *vc;
+  ape_Object *body, *head, *env;
 
-  va = cdr(macro); /* ((env . args) . (do ...)) */
-  vb = car(va);    /* (env . args)*/
+  body = cdr(macro); /* ((env . args) . (do ...)) */
+  head = car(body);  /* (env . args) */
 
   /* arguments environment */
-  vc = ape_cons(A, &nil, car(vb));
-  args_binds(A, cdr(vb), args, vc);
+  env = ape_cons(A, &nil, car(head));
+  args_binds(A, cdr(head), args, env);
 
   /* generate code by macro */
-  return eval(A, cdr(va), vc);
+  return eval(A, cdr(body), env);
 }
 
 static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
