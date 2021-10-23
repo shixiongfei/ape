@@ -61,7 +61,7 @@ static const char *typenames[] = {
 
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
-#define CHUNKSIZE (256)
+#define CHUNKSIZE (512)
 #define GCSTACKSIZE (256)
 #define GCMARKBIT (0x2)
 #define FCMARKBIT (0x4)
@@ -107,6 +107,7 @@ struct ape_Object {
 typedef struct ape_Chunk {
   int reserved;
   int marked_count;
+
   ape_Object objects[CHUNKSIZE];
   struct ape_Chunk *next;
 } ape_Chunk;
