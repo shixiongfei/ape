@@ -105,6 +105,8 @@ struct ape_Object {
  */
 
 typedef struct ape_Chunk {
+  int gc_count;
+  int marked_count;
   ape_Object objects[CHUNKSIZE];
   struct ape_Chunk *next;
 } ape_Chunk;
@@ -129,20 +131,20 @@ struct ape_State {
 
   ape_Handlers handlers;
 
+  int symid;
+  int next_char;
+
   ape_Chunk *chunks;
   int chunks_count;
 
-  ape_Object *gcstack[GCSTACKSIZE];
   int gcstack_idx;
+  ape_Object *gcstack[GCSTACKSIZE];
 
   ape_Object *calllist;
   ape_Object *freelist;
   ape_Object *symlist;
   ape_Object *t;
   ape_Object *env;
-
-  int next_char;
-  int symid;
 };
 
 #define unused(x) ((void)x)
@@ -262,6 +264,9 @@ static void collect_garbage(ape_State *A) {
 
   /* sweep and unmark */
   for (chunk = A->chunks; chunk != NULL; chunk = chunk->next) {
+    chunk->gc_count += 1;
+    chunk->marked_count = 0;
+
     for (i = 0; i < CHUNKSIZE; ++i) {
       ape_Object *obj = &chunk->objects[i];
 
@@ -271,6 +276,7 @@ static void collect_garbage(ape_State *A) {
       /* marked */
       if (tag(obj) & GCMARKBIT) {
         tag(obj) &= ~GCMARKBIT;
+        chunk->marked_count += 1;
         continue;
       }
 
