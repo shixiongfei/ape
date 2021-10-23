@@ -65,18 +65,19 @@ static const char *typenames[] = {
 #define GCSTACKSIZE (256)
 #define GCMARKBIT (0x2)
 #define FCMARKBIT (0x4)
+#define BNMARKBIT (0x8)
 
 typedef union {
   ape_Object *o;
   ape_CFunc f;
-  ape_Integer d;
+  ape_Integer d; /* TODO: Big Number */
   ape_Number n;
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     char s[STRBUFSIZE];
-    char c;
+    unsigned char c;
 #else
-    char c;
+    unsigned char c;
     char s[STRBUFSIZE];
 #endif
   };
@@ -155,14 +156,14 @@ struct ape_State {
 
 /*                Tag
  * +---+---+---+---+---+---+---+---+
- * |        Type       |FC |GC | 1 |
+ * |      Type     |BN |FC |GC | 1 |
  * +---+---+---+---+---+---+---+---+
  * 8   7   6   5   4   3   2   1   0
  */
 
 #define tag(x) ((x)->car.c)
-#define type(x) (tag(x) & 0x1 ? tag(x) >> 3 : APE_TPAIR)
-#define settype(x, t) (tag(x) = (t) << 3 | 1)
+#define type(x) (tag(x) & 0x1 ? tag(x) >> 4 : APE_TPAIR)
+#define settype(x, t) (tag(x) = (t) << 4 | 1)
 
 #define isnil(x) ((x) == &nil)
 
@@ -188,31 +189,31 @@ struct ape_State {
 #define cfunc(x) ((x)->cdr.f)
 
 /* String: Hello, World.
- *                             car                                     cdr
- * +-------------------------------------------------------------+-------------+
- * |           tag                         strbuf                |             |
- * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |             |
- * | | String | 1 | 0 | 1 | | \H | \e | \l | \l | \o | \, | \  | |      +      |
- * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |      |      |
- * |            c             s0   s1   s2   s3   s4   s5   s6   |      |      |
- * +-------------------------------------------------------------+------+------+
- *                                                                      |
- *                              +---------------------------------------+
+ *                             car                                       cdr
+ * +-----------------------------------------------------------------+---------+
+ * |             tag                         strbuf                  |         |
+ * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |         |
+ * | | String | ? | 1 | 0 | 1 | | \H | \e | \l | \l | \o | \, | \  | |    +    |
+ * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |    |    |
+ * |              c               s0   s1   s2   s3   s4   s5   s6   |    |    |
+ * +-----------------------------------------------------------------+----+----+
+ *                                                                        |
+ *                              +-----------------------------------------+
  *                              |
- * +----------------------------+--------------------------------+-------------+
- * |           tag                         strbuf                |             |
- * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |             |
- * | | String | 0 | 0 | 1 | | \W | \o | \r | \l | \d | \. |  6 | |     nil     |
- * | +--------+---+---+---+ +----+----+----+----+----+----+----+ |             |
- * |            c             s0   s1   s2   s3   s4   s5   s6   |             |
- * +-------------------------------------------------------------+-------------+
+ * +----------------------------+------------------------------------+---------+
+ * |             tag                         strbuf                  |         |
+ * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |         |
+ * | | String | ? | 0 | 0 | 1 | | \W | \o | \r | \l | \d | \. |  6 | |   nil   |
+ * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |         |
+ * |              c               s0   s1   s2   s3   s4   s5   s6   |         |
+ * +-----------------------------------------------------------------+---------+
  */
 
 #define strbuf(x) ((x)->car.s)
 #define stridx(x) ((x)->car.s[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
-static ape_Object nil = {{(ape_Object *)(APE_TNIL << 3 | 1)}, {NULL}};
+static ape_Object nil = {{(ape_Object *)(APE_TNIL << 4 | 1)}, {NULL}};
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
   unused(ud);
