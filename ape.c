@@ -658,7 +658,46 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
   for (obj = checktype(A, obj, APE_TPAIR); !isnil(obj); obj = cdr(obj))
     res = ape_cons(A, car(checktype(A, obj, APE_TPAIR)), res);
 
+  /* TODO: string reverse */
+
   return res;
+}
+
+ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
+  if (type(obj) == APE_TPAIR) {
+    while (idx-- > 0) {
+      obj = cdr(obj);
+
+      if (isnil(obj))
+        ape_error(A, "index out of range");
+    }
+    return car(obj);
+  }
+
+  if (type(obj) == APE_TSTRING) {
+    int cnt;
+
+    while (idx > 0) {
+      cnt = strcnt(obj);
+
+      if (cnt == 0 || idx < cnt)
+        break;
+
+      obj = cdr(obj);
+      idx -= cnt;
+
+      if (isnil(obj))
+        ape_error(A, "index out of range");
+    }
+
+    if (cnt == 0)
+      ape_error(A, "index out of range");
+
+    return ape_lstring(A, strbuf(obj) + idx, 1);
+  }
+
+  ape_error(A, "not an iteratable object");
+  return &nil;
 }
 
 ape_Integer ape_tointeger(ape_State *A, ape_Object *obj) {

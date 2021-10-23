@@ -11,6 +11,11 @@
 (print (length '(1 2 3 4 5)))
 (print (length "Hello, World!"))
 
+(print (nth 1 '(1 2 3 4 5)))
+(print (nth 1 "Hello, World!"))
+
+(print (reverse '(1 2 3 4 5)))
+
 (print (car '(1 2 3 4 5)))
 (print (cdr '(1 2 3 4 5)))
 
@@ -24,6 +29,9 @@
 
 (print (type (/ 10 3)))
 (print (type (/ 10 2)))
+
+(print "gensym" (gensym))
+(print "gensym" (gensym))
 
 (def x 100)
 (print "x =" x)
@@ -124,7 +132,7 @@
 
 (print "global x =" x)
 
-(print "let =" (let (x (set! x (+ x 1))
+(print "let x + y =" (let (x (set! x (+ x 1))
                      y 8)
                  (+ x y)))
 

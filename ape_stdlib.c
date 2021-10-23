@@ -54,6 +54,11 @@ static ape_Object *reverse(ape_State *A, ape_Object *args) {
   return ape_reverse(A, ape_nextarg(A, &args));
 }
 
+static ape_Object *nth(ape_State *A, ape_Object *args) {
+  int index = ape_tointeger(A, ape_nextarg(A, &args));
+  return ape_nth(A, ape_nextarg(A, &args), index);
+}
+
 static ape_Object *print(ape_State *A, ape_Object *args) {
   while (!ape_isnil(A, args)) {
     ape_writefp(A, ape_nextarg(A, &args), stdout);
@@ -162,22 +167,16 @@ static const char reduce[] = {"                                                \
   accum)"};
 
 void stdlib_open(ape_State *A) {
-  const Function cfuncs[] = {{"cadr", cadr},
-                             {"cddr", cddr},
-                             {"caddr", caddr},
-                             {"cdddr", cdddr},
-                             {"cadddr", cadddr},
-                             {"cddddr", cddddr},
-                             {"eval", eval},
-                             {"list", list},
-                             {"length", length},
-                             {"reverse", reverse},
-                             {"print", print},
-                             {"unquote", unquote},
-                             {"unquote-splicing", unquote_splicing},
-                             {"gensym", gensym},
-                             {"rem", rem},
-                             {NULL, NULL}};
+  const Function cfuncs[] = {
+      {"cadr", cadr},       {"cddr", cddr},
+      {"caddr", caddr},     {"cdddr", cdddr},
+      {"cadddr", cadddr},   {"cddddr", cddddr},
+      {"eval", eval},       {"list", list},
+      {"length", length},   {"reverse", reverse},
+      {"nth", nth},         {"print", print},
+      {"unquote", unquote}, {"unquote-splicing", unquote_splicing},
+      {"gensym", gensym},   {"rem", rem},
+      {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, let, cond,   when,   unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);
