@@ -105,7 +105,7 @@ struct ape_Object {
  */
 
 typedef struct ape_Chunk {
-  int gc_count;
+  int reserved;
   int marked_count;
   ape_Object objects[CHUNKSIZE];
   struct ape_Chunk *next;
@@ -264,7 +264,6 @@ static void collect_garbage(ape_State *A) {
 
   /* sweep and unmark */
   for (chunk = A->chunks; chunk != NULL; chunk = chunk->next) {
-    chunk->gc_count += 1;
     chunk->marked_count = 0;
 
     for (i = 0; i < CHUNKSIZE; ++i) {
