@@ -99,6 +99,7 @@
 (push "cow" items)
 
 (print items)
+(print (expand '(push "bird" items)))
 
 
 (defn accum (n)
@@ -133,8 +134,8 @@
 (print "global x =" x)
 
 (print "let x + y =" (let (x (set! x (+ x 1))
-                     y 8)
-                 (+ x y)))
+                           y 8)
+                       (+ x y)))
 
 (print "global x =" x)
 

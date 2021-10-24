@@ -1371,6 +1371,8 @@ EVAL:
     if (isnil(var))
       ape_error(A, "unbound variables");
 
+    /* Prevent local variables from being accidentally GC */
+    ape_pushgc(A, var);
     return cdr(var);
   }
 
