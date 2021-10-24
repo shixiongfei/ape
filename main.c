@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
   if (fp == stdin) {
     ape_handlers(A)->error = on_error;
 
-    printf("Ape v%s\n\n", APE_VERSION);
+    printf("Welcome to Ape v%s\n", APE_RELEASE);
   }
 
   gctop = ape_savegc(A);
