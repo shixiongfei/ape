@@ -2,7 +2,6 @@
 Makefile
 objs/
 bin/
-lib/
 .vs/
 *.sln
 *.vcxproj
