@@ -55,7 +55,7 @@ static ape_Object *reverse(ape_State *A, ape_Object *args) {
 }
 
 static ape_Object *nth(ape_State *A, ape_Object *args) {
-  int index = ape_tointeger(A, ape_nextarg(A, &args));
+  int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
   return ape_nth(A, ape_nextarg(A, &args), index);
 }
 

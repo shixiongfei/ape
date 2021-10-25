@@ -133,7 +133,7 @@ struct ape_State {
 
   ape_Handlers handlers;
 
-  int symid;
+  unsigned int symid;
   int next_char;
 
   ape_Chunk *chunks;
@@ -317,7 +317,7 @@ static ape_State *ape_init(ape_State *A) {
   int i, top = ape_savegc(A);
 
   /* init symbol id */
-  A->symid = (uintptr_t)A >> 16; /* random seed */
+  A->symid = (unsigned int)((uintptr_t)A >> 16); /* random seed */
   A->symid = ((A->symid * 214013L + 2531011L) >> 16) & 0x01ff;
 
   /* global environment */
@@ -616,6 +616,18 @@ static int streq(ape_Object *obj, const char *str) {
   return strleq(obj, str, (int)strlen(str));
 }
 
+static ape_Object *symbol(ape_State *A, const char *name, int pushlist) {
+  ape_Object *obj = alloc(A);
+
+  settype(obj, APE_TSYMBOL);
+  cdr(obj) = ape_string(A, name);
+
+  if (pushlist)
+    A->symlist = ape_cons(A, obj, A->symlist);
+
+  return obj;
+}
+
 ape_Object *ape_symbol(ape_State *A, const char *name) {
   ape_Object *obj;
 
@@ -624,13 +636,8 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
     if (streq(cdr(car(obj)), name))
       return car(obj);
 
-  /* create new object, push to symlist and return */
-  obj = alloc(A);
-  settype(obj, APE_TSYMBOL);
-  cdr(obj) = ape_string(A, name);
-  A->symlist = ape_cons(A, obj, A->symlist);
-
-  return obj;
+  /* create new symbol, push to symlist and return */
+  return symbol(A, name, 1);
 }
 
 ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
@@ -649,8 +656,10 @@ ape_Object *ape_ptr(ape_State *A, void *ptr) {
 
 ape_Object *ape_gensym(ape_State *A) {
   char gensym[16] = {0};
-  sprintf(gensym, "#:%d", A->symid++);
-  return ape_symbol(A, gensym);
+  sprintf(gensym, "#:%u", A->symid++);
+
+  /* create new symbol, without push to symlist and return */
+  return symbol(A, gensym, 0);
 }
 
 ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
