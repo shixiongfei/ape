@@ -122,6 +122,10 @@ static const char cond[] = {"                                                  \
           (caddr clauses)                                                      \
         `(cond ,@(cddr clauses)))))"};
 
+static const char apply[] = {"                                                 \
+(defn apply (op args)                                                          \
+  (eval (cons op args)))"};
+
 static const char when[] = {"                                                  \
 (defmacro when (test . body)                                                   \
   `(if ,test (do ,@body) nil))"};
@@ -177,7 +181,7 @@ void stdlib_open(ape_State *A) {
       {"unquote", unquote}, {"unquote-splicing", unquote_splicing},
       {"gensym", gensym},   {"rem", rem},
       {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn, let, cond,   when,   unless,
+  const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);
 
