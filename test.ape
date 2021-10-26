@@ -163,3 +163,12 @@
 (print "recude + =" (reduce + '(1 2 3 4 5) 0))
 
 (print "apply + =" (apply + '(1 2 3 4 5)))
+
+
+(print "nesting unquote =" (let (x 100
+                                 y 'x
+                                 z 'y)
+                             `(,,,z)))
+
+(print "nesting unquote-splicing =" `(,@,@'('(1 2 3)))
+                                    `(,@,''(4 5 6)))
