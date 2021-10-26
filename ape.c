@@ -393,7 +393,7 @@ static void raise_error(ape_State *A, const char *errmsg) {
   fprintf(stderr, "error: %s\n", errmsg);
 
   for (; !isnil(cl); cl = cdr(cl)) {
-    char buf[64];
+    char buf[128];
     ape_tostring(A, car(cl), buf, sizeof(buf));
     fprintf(stderr, "=> %s\n", buf);
   }
@@ -1324,7 +1324,12 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
       ape_Object *args = cdr(obj);
 
       if (fn == unquote_splicing) {
-        obj = checktype(A, eval(A, ape_nextarg(A, &args), env), APE_TPAIR);
+        ape_Object *arg = ape_nextarg(A, &args);
+
+        arg = quasiquote(A, ape_cons(A, arg, &nil), env);
+        arg = car(checktype(A, arg, APE_TPAIR));
+
+        obj = checktype(A, eval(A, arg, env), APE_TPAIR);
 
         for (; !isnil(obj); obj = cdr(obj)) {
           /* (x . y) => (x y) */
@@ -1340,9 +1345,16 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
         }
 
         continue;
-      } else if (fn == unquote)
-        obj = eval(A, ape_nextarg(A, &args), env);
-      else
+      } else if (fn == unquote) {
+        ape_Object *arg = ape_nextarg(A, &args);
+
+        if (type(arg) == APE_TPAIR) {
+          arg = quasiquote(A, ape_cons(A, arg, &nil), env);
+          arg = car(checktype(A, arg, APE_TPAIR));
+        }
+
+        obj = eval(A, arg, env);
+      } else
         obj = quasiquote(A, obj, env);
     }
 

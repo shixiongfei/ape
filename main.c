@@ -23,7 +23,7 @@ static void on_error(ape_State *A, const char *errmsg, ape_Object *calllist) {
   fprintf(stderr, "error: %s\n", errmsg);
 
   for (; !ape_isnil(A, cl); cl = ape_cdr(A, cl)) {
-    char buf[64];
+    char buf[128];
     ape_tostring(A, ape_car(A, cl), buf, sizeof(buf));
     fprintf(stderr, "=> %s\n", buf);
   }
