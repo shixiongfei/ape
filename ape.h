@@ -45,7 +45,6 @@ typedef float floatptr_t;
 extern "C" {
 #endif
 
-typedef intptr_t ape_Integer;
 typedef floatptr_t ape_Number;
 typedef struct ape_Object ape_Object;
 typedef struct ape_State ape_State;
@@ -67,7 +66,6 @@ enum {
   APE_TPAIR,
   APE_TFREE,
   APE_TNIL,
-  APE_TINTEGER,
   APE_TNUMBER,
   APE_TSYMBOL,
   APE_TSTRING,
@@ -103,7 +101,6 @@ APE_API ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt);
 APE_API ape_Object *ape_true(ape_State *A);
 APE_API ape_Object *ape_nil(ape_State *A);
 APE_API ape_Object *ape_bool(ape_State *A, int b);
-APE_API ape_Object *ape_integer(ape_State *A, ape_Integer d);
 APE_API ape_Object *ape_number(ape_State *A, ape_Number n);
 APE_API ape_Object *ape_string(ape_State *A, const char *str);
 APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
@@ -114,7 +111,6 @@ APE_API ape_Object *ape_gensym(ape_State *A);
 APE_API ape_Object *ape_reverse(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx);
 
-APE_API ape_Integer ape_tointeger(ape_State *A, ape_Object *obj);
 APE_API ape_Number ape_tonumber(ape_State *A, ape_Object *obj);
 APE_API int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size);
 APE_API void *ape_toptr(ape_State *A, ape_Object *obj);

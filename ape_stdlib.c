@@ -47,7 +47,7 @@ static ape_Object *eval(ape_State *A, ape_Object *args) {
 static ape_Object *list(ape_State *A, ape_Object *args) { return args; }
 
 static ape_Object *length(ape_State *A, ape_Object *args) {
-  return ape_integer(A, ape_length(A, ape_nextarg(A, &args)));
+  return ape_number(A, ape_length(A, ape_nextarg(A, &args)));
 }
 
 static ape_Object *reverse(ape_State *A, ape_Object *args) {
@@ -55,7 +55,7 @@ static ape_Object *reverse(ape_State *A, ape_Object *args) {
 }
 
 static ape_Object *nth(ape_State *A, ape_Object *args) {
-  int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
+  int index = (int)ape_tonumber(A, ape_nextarg(A, &args));
   return ape_nth(A, ape_nextarg(A, &args), index);
 }
 
@@ -75,12 +75,12 @@ static ape_Object *gensym(ape_State *A, ape_Object *args) {
 }
 
 static ape_Object *rem(ape_State *A, ape_Object *args) {
-  ape_Integer a, b;
+  intptr_t a, b;
 
-  a = ape_tointeger(A, ape_nextarg(A, &args));
-  b = ape_tointeger(A, ape_nextarg(A, &args));
+  a = (intptr_t)ape_tonumber(A, ape_nextarg(A, &args));
+  b = (intptr_t)ape_tonumber(A, ape_nextarg(A, &args));
 
-  return ape_integer(A, a % b);
+  return ape_number(A, (ape_Number)(a % b));
 }
 
 static const char defmacro[] = {"                                              \

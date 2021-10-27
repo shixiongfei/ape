@@ -59,8 +59,8 @@ static const char *primnames[] = {
 };
 
 static const char *typenames[] = {
-    "pair",   "free",     "nil",   "integer",   "number",    "symbol",
-    "string", "function", "macro", "primitive", "cfunction", "pointer",
+    "pair",     "free",  "nil",       "number",    "symbol",  "string",
+    "function", "macro", "primitive", "cfunction", "pointer",
 };
 
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
@@ -74,8 +74,7 @@ static const char *typenames[] = {
 typedef union {
   ape_Object *o;
   ape_CFunc f;
-  ape_Integer d; /* TODO: Big Number */
-  ape_Number n;
+  ape_Number n; /* TODO: Big Decimal */
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     char s[STRBUFSIZE];
@@ -173,10 +172,7 @@ struct ape_State {
 #define settype(x, t) (tag(x) = (t) << 4 | 1)
 
 #define isnil(x) ((x) == &nil)
-
-#define integer(x) ((x)->cdr.d)
 #define number(x) ((x)->cdr.n)
-#define digits(x) (type(x) == APE_TNUMBER ? number(x) : integer(x))
 
 /*      Function / Macro
  * +------------------+-----+
@@ -552,13 +548,6 @@ ape_Object *ape_bool(ape_State *A, int b) {
   return b ? ape_true(A) : ape_nil(A);
 }
 
-ape_Object *ape_integer(ape_State *A, ape_Integer d) {
-  ape_Object *obj = alloc(A);
-  settype(obj, APE_TINTEGER);
-  integer(obj) = d;
-  return obj;
-}
-
 ape_Object *ape_number(ape_State *A, ape_Number n) {
   ape_Object *obj = alloc(A);
   settype(obj, APE_TNUMBER);
@@ -725,10 +714,6 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
   return &nil;
 }
 
-ape_Integer ape_tointeger(ape_State *A, ape_Object *obj) {
-  return integer(checktype(A, obj, APE_TINTEGER));
-}
-
 ape_Number ape_tonumber(ape_State *A, ape_Object *obj) {
   return number(checktype(A, obj, APE_TNUMBER));
 }
@@ -770,7 +755,6 @@ static ape_Object rparen = {0};
 static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
   ape_Object *v, *res, **tail;
-  ape_Integer d;
   ape_Number n;
   int ch, top;
   char buf[64] = {0}, *p;
@@ -894,16 +878,6 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     A->next_char = ch;
 
-    /* try to read as integer */
-#if UINTPTR_MAX > (1ULL << 32)
-    d = strtoll(buf, &p, 10);
-#else
-    d = strtol(buf, &p, 10);
-#endif
-
-    if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
-      return ape_integer(A, d);
-
     /* try to read as number */
     n = (ape_Number)strtod(buf, &p);
 
@@ -941,19 +915,6 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
   switch (type(obj)) {
   case APE_TNIL:
     writestr(A, fn, udata, "nil");
-    break;
-
-  case APE_TINTEGER:
-#if UINTPTR_MAX > (1ULL << 32)
-#if _MSC_VER
-    sprintf(buf, "%I64d", integer(obj));
-#else
-    sprintf(buf, "%ld", integer(obj));
-#endif
-#else
-    sprintf(buf, "%d", integer(obj));
-#endif
-    writestr(A, fn, udata, buf);
     break;
 
   case APE_TNUMBER:
@@ -1097,9 +1058,6 @@ static int equal(ape_Object *a, ape_Object *b) {
   if (type(a) != type(b))
     return 0;
 
-  if (type(a) == APE_TINTEGER)
-    return integer(a) == integer(b);
-
   if (type(a) == APE_TNUMBER)
     return number(a) == number(b);
 
@@ -1130,127 +1088,53 @@ static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
   return res;
 }
 
-static ape_Object *check_arith(ape_State *A, ape_Object *obj) {
-  if (type(obj) != APE_TINTEGER && type(obj) != APE_TNUMBER)
-    ape_error(A, "expected %s or %s, got %s", typenames[APE_TINTEGER],
-              typenames[APE_TNUMBER], typenames[type(obj)]);
-  return obj;
-}
-
-static ape_Object *arith_addfloat(ape_State *A, ape_Object *args,
-                                  ape_Object *env, ape_Number res) {
-  while (!isnil(args)) {
-    ape_Object *x = check_arith(A, evalarg());
-    res += digits(x);
-  }
-
-  return ape_number(A, res);
-}
-
 static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Integer res = 0;
+  ape_Number res = 0;
 
-  while (!isnil(args)) {
-    ape_Object *x = check_arith(A, evalarg());
-
-    if (type(x) == APE_TNUMBER)
-      return arith_addfloat(A, args, env, (ape_Number)res + number(x));
-
-    res += integer(x);
-  }
-
-  return ape_integer(A, res);
-}
-
-static ape_Object *arith_subfloat(ape_State *A, ape_Object *args,
-                                  ape_Object *env, ape_Number res) {
-  while (!isnil(args)) {
-    ape_Object *x = check_arith(A, evalarg());
-    res -= digits(x);
-  }
+  while (!isnil(args))
+    res += number(checktype(A, evalarg(), APE_TNUMBER));
 
   return ape_number(A, res);
 }
 
 static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Integer res;
+  ape_Number res;
   ape_Object *x;
 
   if (isnil(args))
     ape_error(A, "wrong number of operands");
 
-  x = check_arith(A, evalarg());
+  x = checktype(A, evalarg(), APE_TNUMBER);
 
   if (isnil(args))
-    return type(x) == APE_TNUMBER ? ape_number(A, -number(x))
-                                  : ape_integer(A, -integer(x));
+    return ape_number(A, -number(x));
 
-  if (type(x) == APE_TNUMBER)
-    return arith_subfloat(A, args, env, number(x));
+  res = number(x);
 
-  res = integer(x);
-
-  while (!isnil(args)) {
-    x = check_arith(A, evalarg());
-
-    if (type(x) == APE_TNUMBER)
-      return arith_subfloat(A, args, env, (ape_Number)res - number(x));
-
-    res -= integer(x);
-  }
-
-  return ape_integer(A, res);
-}
-
-static ape_Object *arith_mulfloat(ape_State *A, ape_Object *args,
-                                  ape_Object *env, ape_Number res) {
-  while (!isnil(args)) {
-    ape_Object *x = check_arith(A, evalarg());
-    res *= digits(x);
-  }
+  while (!isnil(args))
+    res -= number(checktype(A, evalarg(), APE_TNUMBER));
 
   return ape_number(A, res);
 }
 
 static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Integer res = 1;
+  ape_Number res = 1;
 
-  while (!isnil(args)) {
-    ape_Object *x = check_arith(A, evalarg());
+  while (!isnil(args))
+    res *= number(checktype(A, evalarg(), APE_TNUMBER));
 
-    if (type(x) == APE_TNUMBER)
-      return arith_mulfloat(A, args, env, (ape_Number)res * number(x));
-
-    res *= integer(x);
-  }
-
-  return ape_integer(A, res);
+  return ape_number(A, res);
 }
 
 static ape_Object *check_divzero(ape_State *A, ape_Object *obj) {
-  obj = check_arith(A, obj);
-
-  if (type(obj) == APE_TINTEGER && integer(obj) == 0)
-    ape_error(A, "division by zero");
-
-  if (type(obj) == APE_TNUMBER && number(obj) == 0.0)
+  if (number(checktype(A, obj, APE_TNUMBER)) == (ape_Number)0.0)
     ape_error(A, "division by zero");
 
   return obj;
 }
 
-static ape_Object *arith_divfloat(ape_State *A, ape_Object *args,
-                                  ape_Object *env, ape_Number res) {
-  while (!isnil(args)) {
-    ape_Object *x = check_divzero(A, evalarg());
-    res /= digits(x);
-  }
-
-  return ape_number(A, res);
-}
-
 static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Integer res;
+  ape_Number res;
   ape_Object *x;
 
   if (isnil(args))
@@ -1259,26 +1143,14 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   x = check_divzero(A, evalarg());
 
   if (isnil(args))
-    return ape_number(A, (ape_Number)1 / digits(x));
+    return ape_number(A, (ape_Number)1 / number(x));
 
-  if (type(x) == APE_TNUMBER)
-    return arith_divfloat(A, args, env, number(x));
+  res = number(x);
 
-  res = integer(x);
+  while (!isnil(args))
+    res /= number(check_divzero(A, evalarg()));
 
-  while (!isnil(args)) {
-    x = check_divzero(A, evalarg());
-
-    if (type(x) == APE_TNUMBER)
-      return arith_divfloat(A, args, env, (ape_Number)res / number(x));
-
-    if (res % integer(x) != 0)
-      return arith_divfloat(A, args, env, (ape_Number)res / integer(x));
-
-    res /= integer(x);
-  }
-
-  return ape_integer(A, res);
+  return ape_number(A, res);
 }
 
 #define arith_compare(A, args, env, op)                                        \
@@ -1287,13 +1159,13 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
     if (isnil(args))                                                           \
       res = A->t;                                                              \
     else {                                                                     \
-      va = check_arith(A, evalarg());                                          \
+      va = checktype(A, evalarg(), APE_TNUMBER);                               \
       if (isnil(args))                                                         \
         res = A->t;                                                            \
       else {                                                                   \
         while (!isnil(args)) {                                                 \
-          vb = check_arith(A, evalarg());                                      \
-          if (!(digits(va) op(digits(vb)))) {                                  \
+          vb = checktype(A, evalarg(), APE_TNUMBER);                           \
+          if (!(number(va) op number(vb))) {                                   \
             res = &nil;                                                        \
             break;                                                             \
           }                                                                    \
