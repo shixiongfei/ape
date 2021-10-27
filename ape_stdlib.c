@@ -74,16 +74,6 @@ static ape_Object *gensym(ape_State *A, ape_Object *args) {
   return ape_gensym(A);
 }
 
-static ape_Object *unquote(ape_State *A, ape_Object *args) {
-  ape_error(A, "unquote outside a quasiquote");
-  return ape_nil(A);
-}
-
-static ape_Object *unquote_splicing(ape_State *A, ape_Object *args) {
-  ape_error(A, "unquote-splicing outside a quasiquote");
-  return ape_nil(A);
-}
-
 static ape_Object *rem(ape_State *A, ape_Object *args) {
   ape_Integer a, b;
 
@@ -172,15 +162,11 @@ static const char reduce[] = {"                                                \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"cadr", cadr},       {"cddr", cddr},
-      {"caddr", caddr},     {"cdddr", cdddr},
-      {"cadddr", cadddr},   {"cddddr", cddddr},
-      {"eval", eval},       {"list", list},
-      {"length", length},   {"reverse", reverse},
-      {"nth", nth},         {"print", print},
-      {"unquote", unquote}, {"unquote-splicing", unquote_splicing},
-      {"gensym", gensym},   {"rem", rem},
-      {NULL, NULL}};
+      {"cadr", cadr},       {"cddr", cddr},     {"caddr", caddr},
+      {"cdddr", cdddr},     {"cadddr", cadddr}, {"cddddr", cddddr},
+      {"eval", eval},       {"list", list},     {"length", length},
+      {"reverse", reverse}, {"nth", nth},       {"print", print},
+      {"gensym", gensym},   {"rem", rem},       {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);

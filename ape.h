@@ -76,6 +76,7 @@ enum {
   APE_TPRIM,
   APE_TCFUNC,
   APE_TPTR,
+  APE_TMAX
 };
 
 APE_API ape_State *ape_newstate(ape_Alloc f, void *ud);

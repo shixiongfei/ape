@@ -25,6 +25,8 @@ enum {
   P_EXPAND,
   P_QUOTE,
   P_QUASIQUOTE,
+  P_UNQUOTE,
+  P_UNQUOTE_SPLICING,
   P_AND,
   P_OR,
   P_NOT,
@@ -48,10 +50,12 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",        "set!",     "if",       "fn",   "macro", "expand", "quote",
-    "quasiquote", "and",      "or",       "not",  "do",    "cons",   "car",
-    "cdr",        "set-car!", "set-cdr!", "type", "=",     "<",      "<=",
-    ">",          ">=",       "+",        "-",    "*",     "/",
+    "def",    "set!",  "if",         "fn",       "macro",
+    "expand", "quote", "quasiquote", "unquote",  "unquote-splicing",
+    "and",    "or",    "not",        "do",       "cons",
+    "car",    "cdr",   "set-car!",   "set-cdr!", "type",
+    "=",      "<",     "<=",         ">",        ">=",
+    "+",      "-",     "*",          "/",
 };
 
 static const char *typenames[] = {
@@ -147,6 +151,9 @@ struct ape_State {
   ape_Object *symlist;
   ape_Object *t;
   ape_Object *env;
+
+  ape_Object *primsyms[P_MAX];
+  ape_Object *typesyms[APE_TMAX];
 };
 
 #define unused(x) ((void)x)
@@ -327,6 +334,14 @@ static ape_State *ape_init(ape_State *A) {
   A->t = ape_symbol(A, "true");
   ape_def(A, A->t, A->t, NULL);
 
+  /* init primitive symbols */
+  for (i = 0; i < P_MAX; ++i)
+    A->primsyms[i] = ape_symbol(A, primnames[i]);
+
+  /* init type name symbols */
+  for (i = 0; i < APE_TMAX; ++i)
+    A->typesyms[i] = ape_symbol(A, typenames[i]);
+
   /* register built in primitives */
   for (i = 0; i < P_MAX; ++i) {
     ape_Object *v = alloc(A);
@@ -334,7 +349,7 @@ static ape_State *ape_init(ape_State *A) {
     settype(v, APE_TPRIM);
     prim(v) = i;
 
-    ape_def(A, ape_symbol(A, primnames[i]), v, NULL);
+    ape_def(A, A->primsyms[i], v, NULL);
     ape_restoregc(A, top);
   }
 
@@ -812,7 +827,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       ape_error(A, "stray '''");
 
     /* Transform: '(...) => (quote (...)) */
-    return ape_cons(A, ape_symbol(A, "quote"), ape_cons(A, v, &nil));
+    return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, &nil));
 
   case '`':
     v = ape_read(A, fn, udata);
@@ -821,7 +836,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       ape_error(A, "stray '`'");
 
     /* Transform: `(...) => (quasiquote (...)) */
-    return ape_cons(A, ape_symbol(A, "quasiquote"), ape_cons(A, v, &nil));
+    return ape_cons(A, A->primsyms[P_QUASIQUOTE], ape_cons(A, v, &nil));
 
   case ',':
     ch = fn(A, udata);
@@ -838,10 +853,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     /* Transform: ,@v => (unquote-splicing v) */
     if (ch == '@')
-      return ape_cons(A, ape_symbol(A, "unquote-splicing"), res);
+      return ape_cons(A, A->primsyms[P_UNQUOTE_SPLICING], res);
 
     /* Transform: ,v => (unquote v) */
-    return ape_cons(A, ape_symbol(A, "unquote"), res);
+    return ape_cons(A, A->primsyms[P_UNQUOTE], res);
 
   case '"':
     res = build_string(A, NULL, 0);
@@ -1308,8 +1323,6 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
 }
 
 static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
-  ape_Object *unquote = ape_symbol(A, "unquote");
-  ape_Object *unquote_splicing = ape_symbol(A, "unquote-splicing");
   ape_Object *res = &nil;
   ape_Object **tail = &res;
 
@@ -1323,7 +1336,7 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
       ape_Object *fn = car(obj);
       ape_Object *args = cdr(obj);
 
-      if (fn == unquote_splicing) {
+      if (fn == A->primsyms[P_UNQUOTE_SPLICING]) {
         ape_Object *arg = ape_nextarg(A, &args);
 
         arg = quasiquote(A, ape_cons(A, arg, &nil), env);
@@ -1345,7 +1358,7 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
         }
 
         continue;
-      } else if (fn == unquote) {
+      } else if (fn == A->primsyms[P_UNQUOTE]) {
         ape_Object *arg = ape_nextarg(A, &args);
 
         if (type(arg) == APE_TPAIR) {
@@ -1438,7 +1451,7 @@ EVAL:
     case P_FN:
     case P_MACRO:
       va = ape_cons(A, env, ape_nextarg(A, &args));
-      vb = ape_cons(A, ape_symbol(A, primnames[P_DO]), args);
+      vb = ape_cons(A, A->primsyms[P_DO], args);
       res = alloc(A);
       settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
       cdr(res) = ape_cons(A, va, vb);
@@ -1453,6 +1466,12 @@ EVAL:
       break;
     case P_QUASIQUOTE:
       res = quasiquote(A, ape_nextarg(A, &args), env);
+      break;
+    case P_UNQUOTE:
+      ape_error(A, "unquote outside a quasiquote");
+      break;
+    case P_UNQUOTE_SPLICING:
+      ape_error(A, "unquote-splicing outside a quasiquote");
       break;
     case P_AND:
       while (!isnil(args) && !isnil(res = evalarg()))
@@ -1497,7 +1516,7 @@ EVAL:
       break;
     case P_TYPE:
       va = evalarg();
-      res = ape_symbol(A, typenames[type(va)]);
+      res = A->typesyms[type(va)];
       break;
     case P_EQ:
       va = evalarg();
