@@ -1459,6 +1459,9 @@ EVAL:
       break;
     case P_LT:
       arith_compare(A, args, env, <);
+
+      if (!isnil(res) && equal(va, vb))
+        res = &nil;
       break;
     case P_LTE:
       arith_compare(A, args, env, <);
@@ -1468,6 +1471,9 @@ EVAL:
       break;
     case P_GT:
       arith_compare(A, args, env, >);
+
+      if (!isnil(res) && equal(va, vb))
+        res = &nil;
       break;
     case P_GTE:
       arith_compare(A, args, env, >);
