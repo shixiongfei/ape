@@ -11,10 +11,19 @@
 
 #include <ctype.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "ape.h"
+
+/* assumption: pointers are 32 or 64 bit,
+   and float/double are IEEE binary32/binary64 */
+#if UINTPTR_MAX > (1ULL << 32)
+typedef double floatptr_t;
+#else
+typedef float floatptr_t;
+#endif
 
 enum {
   P_DEF,
@@ -74,7 +83,7 @@ static const char *typenames[] = {
 typedef union {
   ape_Object *o;
   ape_CFunc f;
-  ape_Number n; /* TODO: Big Decimal */
+  floatptr_t n; /* TODO: Big Decimal */
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     char s[STRBUFSIZE];
@@ -548,10 +557,14 @@ ape_Object *ape_bool(ape_State *A, int b) {
   return b ? ape_true(A) : ape_nil(A);
 }
 
-ape_Object *ape_number(ape_State *A, ape_Number n) {
+ape_Object *ape_integer(ape_State *A, long long n) {
+  return ape_number(A, (floatptr_t) n);
+}
+
+ape_Object *ape_number(ape_State *A, double n) {
   ape_Object *obj = alloc(A);
   settype(obj, APE_TNUMBER);
-  number(obj) = n;
+  number(obj) = (floatptr_t)n;
   return obj;
 }
 
@@ -714,7 +727,11 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
   return &nil;
 }
 
-ape_Number ape_tonumber(ape_State *A, ape_Object *obj) {
+long long ape_tointeger(ape_State *A, ape_Object *obj) {
+  return (long long)number(checktype(A, obj, APE_TNUMBER));
+}
+
+double ape_tonumber(ape_State *A, ape_Object *obj) {
   return number(checktype(A, obj, APE_TNUMBER));
 }
 
@@ -755,7 +772,7 @@ static ape_Object rparen = {0};
 static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
   ape_Object *v, *res, **tail;
-  ape_Number n;
+  floatptr_t n;
   int ch, top;
   char buf[64] = {0}, *p;
 
@@ -879,7 +896,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     A->next_char = ch;
 
     /* try to read as number */
-    n = (ape_Number)strtod(buf, &p);
+    n = (floatptr_t)strtod(buf, &p);
 
     if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
       return ape_number(A, n);
@@ -1089,7 +1106,7 @@ static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
 }
 
 static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Number res = 0;
+  floatptr_t res = 0;
 
   while (!isnil(args))
     res += number(checktype(A, evalarg(), APE_TNUMBER));
@@ -1098,7 +1115,7 @@ static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
 }
 
 static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Number res;
+  floatptr_t res;
   ape_Object *x;
 
   if (isnil(args))
@@ -1118,7 +1135,7 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
 }
 
 static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Number res = 1;
+  floatptr_t res = 1;
 
   while (!isnil(args))
     res *= number(checktype(A, evalarg(), APE_TNUMBER));
@@ -1127,14 +1144,14 @@ static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
 }
 
 static ape_Object *check_divzero(ape_State *A, ape_Object *obj) {
-  if (number(checktype(A, obj, APE_TNUMBER)) == (ape_Number)0.0)
+  if (number(checktype(A, obj, APE_TNUMBER)) == (floatptr_t)0.0)
     ape_error(A, "division by zero");
 
   return obj;
 }
 
 static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
-  ape_Number res;
+  floatptr_t res;
   ape_Object *x;
 
   if (isnil(args))
@@ -1143,7 +1160,7 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   x = check_divzero(A, evalarg());
 
   if (isnil(args))
-    return ape_number(A, (ape_Number)1 / number(x));
+    return ape_number(A, (floatptr_t)1 / number(x));
 
   res = number(x);
 
