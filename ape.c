@@ -19,7 +19,7 @@
 
 /* assumption: pointers are 32 or 64 bit,
    and float/double are IEEE binary32/binary64 */
-#if UINTPTR_MAX > (1ULL << 32)
+#if INTPTR_MAX >= INT64_MAX
 typedef double floatptr_t;
 #else
 typedef float floatptr_t;
@@ -74,23 +74,41 @@ static const char *typenames[] = {
 
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
+#if INTPTR_MAX >= INT64_MAX
+#define EXPBUFSIZE 2
+#else
+#define EXPBUFSIZE 1
+#endif
+#define NUMBUFSIZE ((int)sizeof(ape_Object *) - EXPBUFSIZE - 1)
 #define CHUNKSIZE (512)
 #define GCSTACKSIZE (256)
 #define GCMARKBIT (0x2)
 #define FCMARKBIT (0x4)
-#define BNMARKBIT (0x8)
+#define SNMARKBIT (0x4)
 
 typedef union {
   ape_Object *o;
   ape_CFunc f;
-  floatptr_t n; /* TODO: Big Decimal */
+  floatptr_t n; /* TODO: Base-10 Number */
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    char s[STRBUFSIZE];
+    union {
+      char s[STRBUFSIZE];
+      struct {
+        char h[NUMBUFSIZE];
+        unsigned char e[EXPBUFSIZE];
+      };
+    };
     unsigned char c;
 #else
     unsigned char c;
-    char s[STRBUFSIZE];
+    union {
+      struct {
+        unsigned char e[EXPBUFSIZE];
+        char h[NUMBUFSIZE];
+      };
+      char s[STRBUFSIZE];
+    };
 #endif
   };
 } Value;
@@ -181,6 +199,28 @@ struct ape_State {
 #define settype(x, t) (tag(x) = (t) << 4 | 1)
 
 #define isnil(x) ((x) == &nil)
+
+/* TODO: Base-10 Number: value = coefficient * 10^exponent
+ *
+ *                                64Bit Platform
+ * +---------------------------------------------------------------+-----------+
+ * |               sign            16bit              40bit        |   64bit   |
+ * | +--------+---+---+---+---+ +---------+----+----+----+----+----+---------+ |
+ * | | Number | ? |0/1| 0 | 1 | |exponent |          coefficient             | |
+ * | +--------+---+---+---+---+ +---------+----+----+----+----+----+---------+ |
+ * |              c                  e      h0   h1   h2   h3   h4 |           |
+ * +---------------------------------------------------------------+-----------+
+ *
+ *                                32Bit Platform
+ * +---------------------------------------------------------------+-----------+
+ * |               sign            8bit               16bit        |   32bit   |
+ * | +--------+---+---+---+---+ +---------+-------------+----------+---------+ |
+ * | | Number | ? |0/1| 0 | 1 | |exponent |          coefficient             | |
+ * | +--------+---+---+---+---+ +---------+-------------+----------+---------+ |
+ * |              c                  e           h0          h1    |           |
+ * +---------------------------------------------------------------+-----------+
+ */
+
 #define number(x) ((x)->cdr.n)
 
 /*      Function / Macro
@@ -558,7 +598,7 @@ ape_Object *ape_bool(ape_State *A, int b) {
 }
 
 ape_Object *ape_integer(ape_State *A, long long n) {
-  return ape_number(A, (floatptr_t) n);
+  return ape_number(A, (floatptr_t)n);
 }
 
 ape_Object *ape_number(ape_State *A, double n) {
@@ -935,7 +975,7 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
     break;
 
   case APE_TNUMBER:
-#if UINTPTR_MAX > (1ULL << 32)
+#if INTPTR_MAX >= INT64_MAX
     sprintf(buf, "%.14g", number(obj));
 #else
     sprintf(buf, "%.7g", number(obj));
