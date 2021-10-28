@@ -10,6 +10,8 @@
  */
 
 #include <ctype.h>
+#include <float.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -21,8 +23,10 @@
    and float/double are IEEE binary32/binary64 */
 #if INTPTR_MAX >= INT64_MAX
 typedef double floatptr_t;
+#define FP_EPSILON DBL_EPSILON
 #else
 typedef float floatptr_t;
+#define FP_EPSILON FLT_EPSILON
 #endif
 
 enum {
@@ -1118,7 +1122,7 @@ static int equal(ape_Object *a, ape_Object *b) {
     return 0;
 
   if (type(a) == APE_TNUMBER)
-    return number(a) == number(b);
+    return fabs(number(a) - number(b)) < FP_EPSILON;
 
   if (type(a) == APE_TSTRING) {
     for (; !isnil(a); a = cdr(a), b = cdr(b))
@@ -1457,13 +1461,19 @@ EVAL:
       arith_compare(A, args, env, <);
       break;
     case P_LTE:
-      arith_compare(A, args, env, <=);
+      arith_compare(A, args, env, <);
+
+      if (isnil(res) && equal(va, vb))
+        res = A->t;
       break;
     case P_GT:
       arith_compare(A, args, env, >);
       break;
     case P_GTE:
-      arith_compare(A, args, env, >=);
+      arith_compare(A, args, env, >);
+
+      if (isnil(res) && equal(va, vb))
+        res = A->t;
       break;
     case P_ADD:
       res = arith_add(A, args, env);
