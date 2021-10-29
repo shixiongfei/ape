@@ -193,7 +193,7 @@ struct ape_State {
 
 /*                Tag
  * +---+---+---+---+---+---+---+---+
- * |      Type     |BN |FC |GC | 1 |
+ * |      Type     | ? |FC |GC | 1 |
  * +---+---+---+---+---+---+---+---+
  * 8   7   6   5   4   3   2   1   0
  */
@@ -226,21 +226,6 @@ struct ape_State {
  */
 
 #define number(x) ((x)->cdr.n)
-
-/*      Function / Macro
- * +------------------+-----+
- * | Function / Macro | cdr |
- * +------------------+--+--+
- *                       |
- *                 +-----+---------+
- *                 | car | do list |
- *                 +--+--+---------+
- *                    |
- *              +-----+------+
- *              | env | args |
- *              +-----+------+
- */
-
 #define prim(x) ((x)->cdr.c)
 #define cfunc(x) ((x)->cdr.f)
 
@@ -1312,6 +1297,20 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
 
   return res;
 }
+
+/*      Function / Macro
+ * +------------------+-----+
+ * | Function / Macro | cdr |
+ * +------------------+--+--+
+ *                       |
+ *                 +-----+---------+
+ *                 | car | do list |
+ *                 +--+--+---------+
+ *                    |
+ *              +-----+------+
+ *              | env | args |
+ *              +-----+------+
+ */
 
 static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
   ape_Object *body, *head, *env;
