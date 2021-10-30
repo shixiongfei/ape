@@ -351,6 +351,7 @@ static ape_Object *alloc(ape_State *A) {
   A->freelist = cdr(obj);
   ape_pushgc(A, obj);
 
+  memset(obj, 0, sizeof(ape_Object));
   return obj;
 }
 
@@ -480,6 +481,9 @@ void ape_mark(ape_State *A, ape_Object *obj) {
   ape_Object *car;
 
 LOOP:
+  if (!obj)
+    return;
+
   if (tag(obj) & GCMARKBIT)
     return;
 
