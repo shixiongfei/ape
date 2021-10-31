@@ -79,11 +79,11 @@ static const char *typenames[] = {
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
 #if INTPTR_MAX >= INT64_MAX
-#define EXPBUFSIZE 2
+#define EXPNBUFSIZE 2
 #else
-#define EXPBUFSIZE 1
+#define EXPNBUFSIZE 1
 #endif
-#define NUMBUFSIZE ((int)sizeof(ape_Object *) - EXPBUFSIZE - 1)
+#define NUMBUFSIZE ((int)sizeof(ape_Object *) - EXPNBUFSIZE - 1)
 #define CHUNKSIZE (512)
 #define GCSTACKSIZE (256)
 #define GCMARKBIT (0x2)
@@ -100,7 +100,7 @@ typedef union {
       char s[STRBUFSIZE];
       struct {
         char h[NUMBUFSIZE];
-        unsigned char e[EXPBUFSIZE];
+        unsigned char e[EXPNBUFSIZE];
       };
     };
     unsigned char c;
@@ -108,7 +108,7 @@ typedef union {
     unsigned char c;
     union {
       struct {
-        unsigned char e[EXPBUFSIZE];
+        unsigned char e[EXPNBUFSIZE];
         char h[NUMBUFSIZE];
       };
       char s[STRBUFSIZE];
@@ -1025,7 +1025,7 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
     break;
 
   default:
-    sprintf(buf, "[%s 0x%p]", typenames[type(obj)], (void *)obj);
+    sprintf(buf, "[%s %p]", typenames[type(obj)], (void *)obj);
     writestr(A, fn, udata, buf);
     break;
   }
