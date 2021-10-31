@@ -62,6 +62,13 @@
 (print "c =" c)
 
 
+(defn say-hello ((name "Ape"))
+  (print "Hello" name "!"))
+
+(say-hello)
+(say-hello "World")
+
+
 (defn sum (a b)
   (+ a b))
 
