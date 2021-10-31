@@ -90,29 +90,63 @@ static const char *typenames[] = {
 #define FCMARKBIT (0x4)
 #define SNMARKBIT (0x4)
 
+typedef intptr_t slimb_t;
+typedef uintptr_t limb_t;
+
+/* TODO: Decimal(Base-10 Number): value = coefficient * 10^exponent
+ *
+ *                                64Bit Platform
+ * +---------------------------------------------------------------+-----------+
+ * |               sign            16bit              40bit        |   64bit   |
+ * | +--------+---+---+---+---+ +---------+----+----+----+----+----+---------+ |
+ * | | Number | ? |0/1| 0 | 1 | |exponent |          coefficient             | |
+ * | +--------+---+---+---+---+ +---------+----+----+----+----+----+---------+ |
+ * |              c                  e      h0   h1   h2   h3   h4 |           |
+ * +---------------------------------------------------------------+-----------+
+ *
+ *                                32Bit Platform
+ * +---------------------------------------------------------------+-----------+
+ * |               sign            8bit               16bit        |   32bit   |
+ * | +--------+---+---+---+---+ +---------+-------------+----------+---------+ |
+ * | | Number | ? |0/1| 0 | 1 | |exponent |          coefficient             | |
+ * | +--------+---+---+---+---+ +---------+-------------+----------+---------+ |
+ * |              c                  e           h0          h1    |           |
+ * +---------------------------------------------------------------+-----------+
+ */
+
+typedef union {
+  limb_t n;
+  struct {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    limb_t coefficient : NUMBUFSIZE * 8;
+    slimb_t exponent : EXPNBUFSIZE * 8;
+    limb_t type : 4;
+    limb_t reserved : 1;
+    limb_t sign : 1;
+    limb_t flags : 2;
+#else
+    limb_t flags : 2;
+    limb_t sign : 1;
+    limb_t reserved : 1;
+    limb_t type : 4;
+    slimb_t exponent : EXPNBUFSIZE * 8;
+    limb_t coefficient : NUMBUFSIZE * 8;
+#endif
+  };
+} Decimal;
+
 typedef union {
   ape_Object *o;
   ape_CFunc f;
-  floatptr_t n; /* TODO: Base-10 Number */
+  floatptr_t n; /* Alternatives before implementing Decimal */
+  Decimal d;    /* TODO: Decimal */
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    union {
-      char s[STRBUFSIZE];
-      struct {
-        char h[NUMBUFSIZE];
-        unsigned char e[EXPNBUFSIZE];
-      };
-    };
+    char s[STRBUFSIZE];
     unsigned char c;
 #else
     unsigned char c;
-    union {
-      struct {
-        unsigned char e[EXPNBUFSIZE];
-        char h[NUMBUFSIZE];
-      };
-      char s[STRBUFSIZE];
-    };
+    char s[STRBUFSIZE];
 #endif
   };
 } Value;
@@ -203,28 +237,6 @@ struct ape_State {
 #define settype(x, t) (tag(x) = (t) << 4 | 1)
 
 #define isnil(x) ((x) == &nil)
-
-/* TODO: Base-10 Number: value = coefficient * 10^exponent
- *
- *                                64Bit Platform
- * +---------------------------------------------------------------+-----------+
- * |               sign            16bit              40bit        |   64bit   |
- * | +--------+---+---+---+---+ +---------+----+----+----+----+----+---------+ |
- * | | Number | ? |0/1| 0 | 1 | |exponent |          coefficient             | |
- * | +--------+---+---+---+---+ +---------+----+----+----+----+----+---------+ |
- * |              c                  e      h0   h1   h2   h3   h4 |           |
- * +---------------------------------------------------------------+-----------+
- *
- *                                32Bit Platform
- * +---------------------------------------------------------------+-----------+
- * |               sign            8bit               16bit        |   32bit   |
- * | +--------+---+---+---+---+ +---------+-------------+----------+---------+ |
- * | | Number | ? |0/1| 0 | 1 | |exponent |          coefficient             | |
- * | +--------+---+---+---+---+ +---------+-------------+----------+---------+ |
- * |              c                  e           h0          h1    |           |
- * +---------------------------------------------------------------+-----------+
- */
-
 #define number(x) ((x)->cdr.n)
 #define prim(x) ((x)->cdr.c)
 #define cfunc(x) ((x)->cdr.f)
