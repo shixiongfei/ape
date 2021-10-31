@@ -9,6 +9,9 @@
  * https://github.com/shixiongfei/ape
  */
 
+#include <float.h>
+#include <math.h>
+
 #include "ape.h"
 
 typedef struct Function {
@@ -81,6 +84,24 @@ static ape_Object *rem(ape_State *A, ape_Object *args) {
   b = ape_tointeger(A, ape_nextarg(A, &args));
 
   return ape_integer(A, a % b);
+}
+
+static ape_Object *round_(ape_State *A, ape_Object *args) {
+  double x = ape_tonumber(A, ape_nextarg(A, &args));
+  int n = ape_isnil(A, args) ? 0 : (int)ape_tointeger(A, ape_nextarg(A, &args));
+  double p, y, z;
+
+  if (n == 0)
+    return ape_number(A, round(x));
+
+  p = pow(10, n);
+  y = x * p;
+  z = round(y);
+
+  if ((fabs(z - y) - 0.5) < DBL_EPSILON)
+    return ape_number(A, (2.0 * round(y / 2.0)) / p);
+
+  return ape_number(A, z / p);
 }
 
 static const char defmacro[] = {"                                              \
@@ -166,7 +187,8 @@ void stdlib_open(ape_State *A) {
       {"cdddr", cdddr},     {"cadddr", cadddr}, {"cddddr", cddddr},
       {"eval", eval},       {"list", list},     {"length", length},
       {"reverse", reverse}, {"nth", nth},       {"print", print},
-      {"gensym", gensym},   {"rem", rem},       {NULL, NULL}};
+      {"gensym", gensym},   {"rem", rem},       {"round", round_},
+      {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);
