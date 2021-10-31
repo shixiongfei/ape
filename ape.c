@@ -1230,16 +1230,33 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
 
 static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
                        ape_Object *env) {
+  ape_Object *bind;
+
   while (!isnil(syms)) {
+    /* rest arguments */
     if (type(syms) != APE_TPAIR) {
       ape_def(A, syms, args, env);
       return;
     }
 
-    if (isnil(args))
-      ape_error(A, "wrong number of arguments");
+    bind = car(syms);
 
-    ape_def(A, car(syms), car(args), env);
+    if (isnil(args)) {
+      ape_Object *arg;
+
+      if (type(bind) != APE_TPAIR)
+        ape_error(A, "wrong number of arguments");
+
+      arg = cdr(bind);
+      /* default argument */
+      ape_def(A, car(bind), eval(A, car(arg), env), env);
+    } else {
+      if (type(bind) == APE_TPAIR)
+        bind = car(bind);
+
+      /* bind argument */
+      ape_def(A, bind, car(args), env);
+    }
 
     syms = cdr(syms);
     args = cdr(args);
