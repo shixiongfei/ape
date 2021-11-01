@@ -76,6 +76,9 @@ static const char *typenames[] = {
     "function", "macro", "primitive", "cfunction", "pointer",
 };
 
+typedef intptr_t slimb_t;
+typedef uintptr_t limb_t;
+
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
 #if INTPTR_MAX >= INT64_MAX
@@ -89,9 +92,7 @@ static const char *typenames[] = {
 #define GCMARKBIT (0x2)
 #define FCMARKBIT (0x4)
 #define SNMARKBIT (0x4)
-
-typedef intptr_t slimb_t;
-typedef uintptr_t limb_t;
+#define HASHMASK ((((limb_t)1) << (STRBUFSIZE * 8)) - 1)
 
 typedef union {
   ape_Object *o;
@@ -116,6 +117,15 @@ typedef union {
 #else
     unsigned char c;
     char s[STRBUFSIZE];
+#endif
+  };
+  struct {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    limb_t hash : STRBUFSIZE * 8;
+    limb_t __ : 8;
+#else
+    limb_t __ : 8;
+    limb_t hash : STRBUFSIZE * 8;
 #endif
   };
 } Value;
@@ -206,6 +216,7 @@ struct ape_State {
 #define settype(x, t) (tag(x) = (t) << 4 | 1)
 
 #define isnil(x) ((x) == &nil)
+#define hash(x) ((x)->car.hash)
 
 /* TODO: Decimal(Base-10 Number): value = coefficient * 10^exponent
  *
@@ -256,7 +267,7 @@ struct ape_State {
  */
 
 #define strbuf(x) ((x)->car.s)
-#define stridx(x) ((x)->car.s[STRBUFINDEX])
+#define stridx(x) (strbuf(x)[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
 static ape_Object nil = {{(ape_Object *)(APE_TNIL << 4 | 1)}, {NULL}};
@@ -299,9 +310,12 @@ static int extend_chunks(ape_State *A) {
   return 0;
 }
 
-static void collect_garbage(ape_State *A) {
+static double collect_garbage(ape_State *A) {
   ape_Chunk *chunk;
-  int i;
+  int i, marked_count = 0;
+
+  if (A->chunks_count == 0)
+    return 1.0;
 
   /* mark */
   for (i = 0; i < A->gcstack_idx; i++)
@@ -334,7 +348,11 @@ static void collect_garbage(ape_State *A) {
       cdr(obj) = A->freelist;
       A->freelist = obj;
     }
+
+    marked_count += chunk->marked_count;
   }
+
+  return (double)marked_count / ((double)A->chunks_count * CHUNKSIZE);
 }
 
 static ape_Object *alloc(ape_State *A) {
@@ -342,11 +360,13 @@ static ape_Object *alloc(ape_State *A) {
 
   /* do gc if freelist has no more objects */
   if (isnil(A->freelist)) {
-    collect_garbage(A);
+    double usage = collect_garbage(A);
 
-    if (isnil(A->freelist))
+    /* Expand the capacity when the usage rate reaches 75% */
+    if (usage > 0.75)
       if (extend_chunks(A) < 0)
-        ape_error(A, "out of memory");
+        if (isnil(A->freelist))
+          ape_error(A, "out of memory");
   }
 
   /* get object from freelist and push to the gcstack */
@@ -671,11 +691,13 @@ static int streq(ape_Object *obj, const char *str) {
   return strleq(obj, str, (int)strlen(str));
 }
 
-static ape_Object *symbol(ape_State *A, const char *name, int pushlist) {
+static ape_Object *symbol(ape_State *A, limb_t h, const char *name, int len,
+                          int pushlist) {
   ape_Object *obj = alloc(A);
 
   settype(obj, APE_TSYMBOL);
-  cdr(obj) = ape_string(A, name);
+  hash(obj) = h;
+  cdr(obj) = ape_lstring(A, name, len);
 
   if (pushlist)
     A->symlist = ape_cons(A, obj, A->symlist);
@@ -683,16 +705,28 @@ static ape_Object *symbol(ape_State *A, const char *name, int pushlist) {
   return obj;
 }
 
+static limb_t fast_hash(const char *str, int len) {
+  limb_t h = 5381;
+  int i;
+
+  for (i = 0; i < len; ++i)
+    h = (h * 33 + str[i]) & HASHMASK;
+
+  return h;
+}
+
 ape_Object *ape_symbol(ape_State *A, const char *name) {
   ape_Object *obj;
+  int len = (int)strlen(name);
+  limb_t h = fast_hash(name, len);
 
   /* try to find in symlist */
   for (obj = A->symlist; !isnil(obj); obj = cdr(obj))
-    if (streq(cdr(car(obj)), name))
+    if (hash(car(obj)) == h && strleq(cdr(car(obj)), name, len))
       return car(obj);
 
   /* create new symbol, push to symlist and return */
-  return symbol(A, name, 1);
+  return symbol(A, h, name, len, 1);
 }
 
 ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
@@ -711,10 +745,10 @@ ape_Object *ape_ptr(ape_State *A, void *ptr) {
 
 ape_Object *ape_gensym(ape_State *A) {
   char gensym[16] = {0};
-  sprintf(gensym, "#:%u", A->symid++);
+  int len = sprintf(gensym, "#:%u", A->symid++);
 
   /* create new symbol, without push to symlist and return */
-  return symbol(A, gensym, 0);
+  return symbol(A, fast_hash(gensym, len), gensym, len, 0);
 }
 
 ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
@@ -846,7 +880,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       if (v == NULL)
         ape_error(A, "unclosed list");
 
-      if (type(v) == APE_TSYMBOL && streq(cdr(v), "."))
+      if (type(v) == APE_TSYMBOL && strleq(cdr(v), ".", 1))
         /* dotted pair */
         *tail = ape_read(A, fn, udata);
       else {
