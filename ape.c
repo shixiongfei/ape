@@ -340,7 +340,7 @@ static double collect_garbage(ape_State *A) {
       }
 
       if (type(obj) == APE_TPTR && A->handlers.gc)
-        A->handlers.gc(A, obj);
+        A->handlers.gc(A, obj, A->env);
 
       settype(obj, APE_TFREE);
       cdr(obj) = A->freelist;
@@ -523,7 +523,7 @@ LOOP:
 
   case APE_TPTR:
     if (A->handlers.mark)
-      A->handlers.mark(A, obj);
+      A->handlers.mark(A, obj, A->env);
     break;
   }
 }
@@ -1157,16 +1157,14 @@ static int equal(ape_Object *a, ape_Object *b) {
   return 0;
 }
 
-static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env);
-
-#define evalarg() eval(A, ape_nextarg(A, &args), env)
+#define evalarg() ape_eval(A, ape_nextarg(A, &args), env)
 
 static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
   ape_Object *res = &nil;
   ape_Object **tail = &res;
 
   while (!isnil(list)) {
-    *tail = ape_cons(A, eval(A, ape_nextarg(A, &list), env), &nil);
+    *tail = ape_cons(A, ape_eval(A, ape_nextarg(A, &list), env), &nil);
     tail = &cdr(*tail);
   }
 
@@ -1282,7 +1280,7 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
 
       arg = cdr(bind);
       /* default argument */
-      ape_def(A, car(bind), eval(A, car(arg), env), env);
+      ape_def(A, car(bind), ape_eval(A, car(arg), env), env);
     } else {
       if (type(bind) == APE_TPAIR)
         bind = car(bind);
@@ -1316,7 +1314,7 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
         arg = quasiquote(A, ape_cons(A, arg, &nil), env);
         arg = car(checktype(A, arg, APE_TPAIR));
 
-        obj = checktype(A, eval(A, arg, env), APE_TPAIR);
+        obj = checktype(A, ape_eval(A, arg, env), APE_TPAIR);
 
         for (; !isnil(obj); obj = cdr(obj)) {
           /* (x . y) => (x y) */
@@ -1340,7 +1338,7 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
           arg = car(checktype(A, arg, APE_TPAIR));
         }
 
-        obj = eval(A, arg, env);
+        obj = ape_eval(A, arg, env);
       } else
         obj = quasiquote(A, obj, env);
     }
@@ -1377,14 +1375,16 @@ static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
   args_binds(A, cdr(head), args, env);
 
   /* generate code by macro */
-  return eval(A, cdr(body), env);
+  return ape_eval(A, cdr(body), env);
 }
 
-static ape_Object *eval(ape_State *A, ape_Object *expr, ape_Object *env) {
+ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
   ape_Object *res, *va, *vb; /* registers */
   int gctop;
+
+  env = env ? env : A->env;
 
 EVAL:
   if (type(expr) == APE_TSYMBOL) {
@@ -1411,7 +1411,7 @@ EVAL:
   ape_pushgc(A, expr);
   ape_pushgc(A, env);
 
-  fn = eval(A, car(expr), env);
+  fn = ape_eval(A, car(expr), env);
   args = cdr(expr);
   res = &nil;
 
@@ -1446,7 +1446,7 @@ EVAL:
       break;
     case P_EXPAND:
       va = evalarg();
-      vb = checktype(A, eval(A, car(va), env), APE_TMACRO);
+      vb = checktype(A, ape_eval(A, car(va), env), APE_TMACRO);
       res = expand(A, vb, cdr(va));
       break;
     case P_QUOTE:
@@ -1475,7 +1475,7 @@ EVAL:
     case P_DO:
       if (!isnil(args)) {
         for (; !isnil(cdr(args)); args = cdr(args))
-          eval(A, car(args), env);
+          ape_eval(A, car(args), env);
 
         expr = car(args);
 
@@ -1552,7 +1552,7 @@ EVAL:
     }
     break;
   case APE_TCFUNC:
-    res = cfunc(fn)(A, eval_list(A, args, env));
+    res = cfunc(fn)(A, eval_list(A, args, env), env);
     break;
   case APE_TFUNC:
     va = cdr(fn); /* ((env . args) . (do ...)) */
@@ -1587,10 +1587,6 @@ EVAL:
   A->calllist = cdr(&cl);
 
   return res;
-}
-
-ape_Object *ape_eval(ape_State *A, ape_Object *expr) {
-  return eval(A, expr, A->env);
 }
 
 static char readfp(ape_State *A, void *udata) {

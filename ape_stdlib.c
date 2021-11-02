@@ -19,50 +19,52 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
-static ape_Object *cadr(ape_State *A, ape_Object *args) {
+static ape_Object *cadr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *cddr(ape_State *A, ape_Object *args) {
+static ape_Object *cddr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_cdr(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *caddr(ape_State *A, ape_Object *args) {
-  return ape_car(A, cddr(A, args));
+static ape_Object *caddr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cddr(A, args, env));
 }
 
-static ape_Object *cdddr(ape_State *A, ape_Object *args) {
-  return ape_cdr(A, cddr(A, args));
+static ape_Object *cdddr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cddr(A, args, env));
 }
 
-static ape_Object *cadddr(ape_State *A, ape_Object *args) {
-  return ape_car(A, cdddr(A, args));
+static ape_Object *cadddr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cdddr(A, args, env));
 }
 
-static ape_Object *cddddr(ape_State *A, ape_Object *args) {
-  return ape_cdr(A, cdddr(A, args));
+static ape_Object *cddddr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cdddr(A, args, env));
 }
 
-static ape_Object *eval(ape_State *A, ape_Object *args) {
-  return ape_eval(A, ape_nextarg(A, &args));
+static ape_Object *eval(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_eval(A, ape_nextarg(A, &args), env);
 }
 
-static ape_Object *list(ape_State *A, ape_Object *args) { return args; }
+static ape_Object *list(ape_State *A, ape_Object *args, ape_Object *env) {
+  return args;
+}
 
-static ape_Object *length(ape_State *A, ape_Object *args) {
+static ape_Object *length(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_integer(A, ape_length(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *reverse(ape_State *A, ape_Object *args) {
+static ape_Object *reverse(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_reverse(A, ape_nextarg(A, &args));
 }
 
-static ape_Object *nth(ape_State *A, ape_Object *args) {
+static ape_Object *nth(ape_State *A, ape_Object *args, ape_Object *env) {
   int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
   return ape_nth(A, ape_nextarg(A, &args), index);
 }
 
-static ape_Object *print(ape_State *A, ape_Object *args) {
+static ape_Object *print(ape_State *A, ape_Object *args, ape_Object *env) {
   while (!ape_isnil(A, args)) {
     ape_writefp(A, ape_nextarg(A, &args), stdout);
 
@@ -73,11 +75,11 @@ static ape_Object *print(ape_State *A, ape_Object *args) {
   return ape_nil(A);
 }
 
-static ape_Object *gensym(ape_State *A, ape_Object *args) {
+static ape_Object *gensym(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_gensym(A);
 }
 
-static ape_Object *rem(ape_State *A, ape_Object *args) {
+static ape_Object *rem(ape_State *A, ape_Object *args, ape_Object *env) {
   long long a, b;
 
   a = ape_tointeger(A, ape_nextarg(A, &args));
@@ -86,7 +88,7 @@ static ape_Object *rem(ape_State *A, ape_Object *args) {
   return ape_integer(A, a % b);
 }
 
-static ape_Object *round_(ape_State *A, ape_Object *args) {
+static ape_Object *round_(ape_State *A, ape_Object *args, ape_Object *env) {
   double x = ape_tonumber(A, ape_nextarg(A, &args));
   int n = ape_isnil(A, args) ? 0 : (int)ape_tointeger(A, ape_nextarg(A, &args));
   double p, y, z;
@@ -202,7 +204,7 @@ void stdlib_open(ape_State *A) {
   /* ape libs */
   for (const char **lib = stdlib; *lib; ++lib) {
     ape_Object *expr = ape_readstring(A, *lib);
-    ape_eval(A, expr);
+    ape_eval(A, expr, NULL);
     ape_restoregc(A, gctop);
   }
 }

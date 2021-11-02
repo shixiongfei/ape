@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
       fflush(stdout);
     }
 
-    expr = ape_eval(A, expr);
+    expr = ape_eval(A, expr, NULL);
 
     if (fp == stdin) {
       ape_writefp(A, expr, stdout);

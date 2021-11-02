@@ -38,7 +38,8 @@ extern "C" {
 
 typedef struct ape_Object ape_Object;
 typedef struct ape_State ape_State;
-typedef ape_Object *(*ape_CFunc)(ape_State *A, ape_Object *args);
+typedef ape_Object *(*ape_CFunc)(ape_State *A, ape_Object *args,
+                                 ape_Object *env);
 
 typedef void (*ape_ErrorFunc)(ape_State *A, const char *errmsg, ape_Object *cl);
 typedef void (*ape_WriteFunc)(ape_State *A, void *udata, char ch);
@@ -116,7 +117,7 @@ APE_API ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
 APE_API ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
                             ape_Object *env);
 APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
-APE_API ape_Object *ape_eval(ape_State *A, ape_Object *expr);
+APE_API ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env);
 
 APE_API ape_Object *ape_readstring(ape_State *A, const char *str);
 APE_API ape_Object *ape_readfp(ape_State *A, FILE *fp);
