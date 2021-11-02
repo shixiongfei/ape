@@ -87,7 +87,7 @@ typedef uintptr_t limb_t;
 #define EXPNBUFSIZE 1
 #endif
 #define NUMBUFSIZE ((int)sizeof(ape_Object *) - EXPNBUFSIZE - 1)
-#define CHUNKSIZE (512)
+#define CHUNKSIZE (0xFFFF)
 #define GCSTACKSIZE (256)
 #define GCMARKBIT (0x2)
 #define FCMARKBIT (0x4)
@@ -153,11 +153,11 @@ struct ape_Object {
  */
 
 typedef struct ape_Chunk {
-  int reserved;
-  int marked_count;
-
   ape_Object objects[CHUNKSIZE];
-  struct ape_Chunk *next;
+  union {
+    ape_Object _; /* memory alignment */
+    struct ape_Chunk *next;
+  };
 } ape_Chunk;
 
 /*                        Symbol List
@@ -326,8 +326,6 @@ static double collect_garbage(ape_State *A) {
 
   /* sweep and unmark */
   for (chunk = A->chunks; chunk != NULL; chunk = chunk->next) {
-    chunk->marked_count = 0;
-
     for (i = 0; i < CHUNKSIZE; ++i) {
       ape_Object *obj = &chunk->objects[i];
 
@@ -337,7 +335,7 @@ static double collect_garbage(ape_State *A) {
       /* marked */
       if (tag(obj) & GCMARKBIT) {
         tag(obj) &= ~GCMARKBIT;
-        chunk->marked_count += 1;
+        marked_count += 1;
         continue;
       }
 
@@ -348,8 +346,6 @@ static double collect_garbage(ape_State *A) {
       cdr(obj) = A->freelist;
       A->freelist = obj;
     }
-
-    marked_count += chunk->marked_count;
   }
 
   return (double)marked_count / ((double)A->chunks_count * CHUNKSIZE);
