@@ -176,7 +176,7 @@ static const char filter[] = {"                                                \
   (reverse res))"};
 
 static const char reduce[] = {"                                                \
-(defn reduce (proc list accum)                                                 \
+(defn reduce (proc accum list)                                                 \
   (for x list                                                                  \
     (set! accum (proc accum x)))                                               \
   accum)"};
