@@ -1106,15 +1106,47 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
  */
 
 static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
+  ape_Object *frame, *x;
+
   /* Try to find in environment */
   for (; !isnil(env); env = cdr(env)) {
-    ape_Object *frame = car(env);
+    frame = car(env);
 
     for (; !isnil(frame); frame = cdr(frame)) {
-      ape_Object *x = car(frame);
+      x = car(frame);
 
       if (car(x) == sym)
         return x;
+    }
+
+    if (!recur)
+      return &nil;
+  }
+  return &nil;
+}
+
+ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
+                        int recur) {
+  ape_Object *frame, *x, *p = &nil;
+
+  env = env ? env : A->env;
+  sym = checktype(A, sym, APE_TSYMBOL);
+
+  /* Try to find in environment */
+  for (; !isnil(env); env = cdr(env)) {
+    frame = car(env);
+
+    for (; !isnil(frame); p = frame, frame = cdr(frame)) {
+      x = car(frame);
+
+      if (car(x) == sym) {
+        if (isnil(p))
+          car(env) = cdr(frame);
+        else
+          cdr(p) = cdr(frame);
+
+        return cdr(x);
+      }
     }
 
     if (!recur)

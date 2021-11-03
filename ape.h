@@ -114,6 +114,8 @@ APE_API ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata);
 APE_API void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn,
                        void *udata, int strqt);
 
+APE_API ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
+                                int recur);
 APE_API ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
                             ape_Object *env);
 APE_API ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,

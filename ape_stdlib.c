@@ -131,6 +131,10 @@ static ape_Object *cddddr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_cdr(A, cdddr(A, args, env));
 }
 
+static ape_Object *unbound(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_unbound(A, ape_nextarg(A, &args), env, 1);
+}
+
 static ape_Object *eval(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_eval(A, ape_nextarg(A, &args), env);
 }
