@@ -49,12 +49,16 @@ static ape_Object *eval(ape_State *A, ape_Object *args, ape_Object *env) {
 
 static ape_Object *load(ape_State *A, ape_Object *args, ape_Object *env) {
   char filename[260] = {0};
-  ape_tostring(A, ape_nextarg(A, &args), filename, sizeof(filename));
+  ape_tostring(A, ape_nextarg(A, &args), filename, sizeof(filename) - 1);
   return ape_load(A, filename, env);
 }
 
 static ape_Object *list(ape_State *A, ape_Object *args, ape_Object *env) {
   return args;
+}
+
+static ape_Object *concat(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_concat(A, args);
 }
 
 static ape_Object *length(ape_State *A, ape_Object *args, ape_Object *env) {
@@ -191,12 +195,12 @@ static const char reduce[] = {"                                                \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"cadr", cadr},     {"cddr", cddr},       {"caddr", caddr},
-      {"cdddr", cdddr},   {"cadddr", cadddr},   {"cddddr", cddddr},
-      {"eval", eval},     {"load", load},       {"list", list},
-      {"length", length}, {"reverse", reverse}, {"nth", nth},
-      {"print", print},   {"gensym", gensym},   {"rem", rem},
-      {"round", round_},  {NULL, NULL}};
+      {"cadr", cadr},     {"cddr", cddr},     {"caddr", caddr},
+      {"cdddr", cdddr},   {"cadddr", cadddr}, {"cddddr", cddddr},
+      {"eval", eval},     {"load", load},     {"list", list},
+      {"concat", concat}, {"length", length}, {"reverse", reverse},
+      {"nth", nth},       {"print", print},   {"gensym", gensym},
+      {"rem", rem},       {"round", round_},  {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);

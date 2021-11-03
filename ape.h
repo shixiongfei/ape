@@ -96,6 +96,7 @@ APE_API ape_Object *ape_integer(ape_State *A, long long n);
 APE_API ape_Object *ape_number(ape_State *A, double n);
 APE_API ape_Object *ape_string(ape_State *A, const char *str);
 APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
+APE_API ape_Object *ape_concat(ape_State *A, ape_Object *objs);
 APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
 APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
 APE_API ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype);

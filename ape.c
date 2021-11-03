@@ -664,6 +664,28 @@ ape_Object *ape_lstring(ape_State *A, const char *str, int len) {
   return obj;
 }
 
+ape_Object *ape_concat(ape_State *A, ape_Object *objs) {
+  ape_Object *obj = build_string(A, NULL, 0);
+  ape_Object *tail = obj;
+  ape_Object *str;
+  int i, size;
+
+  while (!isnil(objs)) {
+    str = checktype(A, ape_nextarg(A, &objs), APE_TSTRING);
+
+    while (!isnil(str)) {
+      size = strcnt(str);
+
+      for (i = 0; i < size; ++i)
+        tail = build_string(A, tail, strbuf(str)[i]);
+
+      str = cdr(str);
+    }
+  }
+
+  return obj;
+}
+
 static int strleq(ape_Object *obj, const char *str, int len) {
   int i, j = 0;
 
@@ -1618,7 +1640,6 @@ ape_Object *ape_load(ape_State *A, const char *file, ape_Object *env) {
   }
 
   fclose(fp);
-  
   return &nil;
 }
 
