@@ -1594,6 +1594,34 @@ EVAL:
   return res;
 }
 
+ape_Object *ape_load(ape_State *A, const char *file, ape_Object *env) {
+  ape_Object *expr;
+  FILE *fp;
+  int gctop;
+
+  fp = fopen(file, "rb");
+
+  if (!fp)
+    ape_error(A, "could not open input file");
+
+  env = env ? env : A->env;
+  gctop = ape_savegc(A);
+
+  for (;;) {
+    expr = ape_readfp(A, fp);
+
+    if (!expr)
+      break;
+
+    ape_eval(A, expr, env);
+    ape_restoregc(A, gctop);
+  }
+
+  fclose(fp);
+  
+  return &nil;
+}
+
 static char readbuffer(ape_State *A, void *udata) {
   CharPtrInt *x = (CharPtrInt *)udata;
   int ch = '\0';

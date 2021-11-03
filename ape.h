@@ -119,6 +119,7 @@ APE_API ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
                             ape_Object *env);
 APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
 APE_API ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env);
+APE_API ape_Object *ape_load(ape_State *A, const char *file, ape_Object *env);
 
 APE_API ape_Object *ape_readstring(ape_State *A, const char *str);
 APE_API ape_Object *ape_readfp(ape_State *A, FILE *fp);
