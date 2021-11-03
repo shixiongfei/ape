@@ -287,20 +287,20 @@ static const char reduce[] = {"                                                \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"caar", caar},       {"cadr", cadr},     {"cdar", cdar},
-      {"cddr", cddr},       {"caaar", caaar},   {"caadr", caadr},
-      {"cadar", cadar},     {"caddr", caddr},   {"cdaar", cdaar},
-      {"cdadr", cdadr},     {"cddar", cddar},   {"cdddr", cdddr},
-      {"caaaar", caaaar},   {"caaadr", caaadr}, {"caadar", caadar},
-      {"caaddr", caaddr},   {"cadaar", cadaar}, {"cadadr", cadadr},
-      {"caddar", caddar},   {"cadddr", cadddr}, {"cdaaar", cdaaar},
-      {"cdaadr", cdaadr},   {"cdadar", cdadar}, {"cdaddr", cdaddr},
-      {"cddaar", cddaar},   {"cddadr", cddadr}, {"cdddar", cdddar},
-      {"cddddr", cddddr},   {"eval", eval},     {"load", load},
-      {"list", list},       {"concat", concat}, {"length", length},
-      {"reverse", reverse}, {"nth", nth},       {"print", print},
-      {"gensym", gensym},   {"rem", rem},       {"round", round_},
-      {NULL, NULL}};
+      {"caar", caar},     {"cadr", cadr},       {"cdar", cdar},
+      {"cddr", cddr},     {"caaar", caaar},     {"caadr", caadr},
+      {"cadar", cadar},   {"caddr", caddr},     {"cdaar", cdaar},
+      {"cdadr", cdadr},   {"cddar", cddar},     {"cdddr", cdddr},
+      {"caaaar", caaaar}, {"caaadr", caaadr},   {"caadar", caadar},
+      {"caaddr", caaddr}, {"cadaar", cadaar},   {"cadadr", cadadr},
+      {"caddar", caddar}, {"cadddr", cadddr},   {"cdaaar", cdaaar},
+      {"cdaadr", cdaadr}, {"cdadar", cdadar},   {"cdaddr", cdaddr},
+      {"cddaar", cddaar}, {"cddadr", cddadr},   {"cdddar", cdddar},
+      {"cddddr", cddddr}, {"unbound", unbound}, {"eval", eval},
+      {"load", load},     {"list", list},       {"concat", concat},
+      {"length", length}, {"reverse", reverse}, {"nth", nth},
+      {"print", print},   {"gensym", gensym},   {"rem", rem},
+      {"round", round_},  {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);
