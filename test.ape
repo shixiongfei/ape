@@ -97,14 +97,13 @@
 (print "Count" (count))
 
 
-(defmacro push (val lst)
-  `(set! ,lst (cons ,val ,lst)))
-
 (def items (list "cat" "dog" "fox"))
 
 (push "owl" items)
 (push "cow" items)
+(push "wolf" items)
 
+(print (pop items))
 (print items)
 (print (expand '(push "bird" items)))
 

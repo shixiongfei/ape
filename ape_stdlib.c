@@ -285,6 +285,17 @@ static const char reduce[] = {"                                                \
     (set! accum (proc accum x)))                                               \
   accum)"};
 
+static const char push[] = {"                                                  \
+(defmacro push (val place)                                                     \
+  `(set! ,place (cons ,val ,place)))"};
+
+static const char pop[] = {"                                                   \
+(defmacro pop (place)                                                          \
+  (let (gx (gensym))                                                           \
+    `(let (,gx (car ,place))                                                   \
+       (set! ,place (cdr ,place))                                              \
+       ,gx)))"};
+
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
       {"caar", caar},     {"cadr", cadr},       {"cdar", cdar},
@@ -301,8 +312,9 @@ void stdlib_open(ape_State *A) {
       {"length", length}, {"reverse", reverse}, {"nth", nth},
       {"print", print},   {"gensym", gensym},   {"rem", rem},
       {"round", round_},  {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
-                          while_,   for_, map, filter, reduce, NULL};
+  const char *stdlib[] = {defmacro, defn,   let,    cond, apply,
+                          when,     unless, while_, for_, map,
+                          filter,   reduce, push,   pop,  NULL};
   int gctop = ape_savegc(A);
 
   /* c libs */
