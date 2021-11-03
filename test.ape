@@ -63,10 +63,10 @@
 
 
 (defn say-hello ((name "Ape"))
-  (print "Hello" name "!"))
+  (concat "Hello " name "!"))
 
-(say-hello)
-(say-hello "World")
+(print (say-hello))
+(print (say-hello "World"))
 
 
 (defn sum (a b)
