@@ -16,7 +16,7 @@
 
 #define APE_MAJOR 0
 #define APE_MINOR 1
-#define APE_PATCH 1
+#define APE_PATCH 2
 
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
@@ -98,7 +98,7 @@ APE_API ape_Object *ape_string(ape_State *A, const char *str);
 APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
 APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
 APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
-APE_API ape_Object *ape_ptr(ape_State *A, void *ptr);
+APE_API ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype);
 APE_API ape_Object *ape_gensym(ape_State *A);
 APE_API ape_Object *ape_reverse(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx);
@@ -106,6 +106,7 @@ APE_API ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx);
 APE_API long long ape_tointeger(ape_State *A, ape_Object *obj);
 APE_API double ape_tonumber(ape_State *A, ape_Object *obj);
 APE_API int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size);
+APE_API int ape_ptrtype(ape_State *A, ape_Object *obj);
 APE_API void *ape_toptr(ape_State *A, ape_Object *obj);
 
 APE_API ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata);

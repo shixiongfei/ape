@@ -732,10 +732,11 @@ ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
   return obj;
 }
 
-ape_Object *ape_ptr(ape_State *A, void *ptr) {
+ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype) {
   ape_Object *obj = alloc(A);
   settype(obj, APE_TPTR);
   cdr(obj) = (ape_Object *)ptr;
+  hash(obj) = subtype & 0xFFFF;
   return obj;
 }
 
@@ -829,6 +830,10 @@ int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size) {
   *x.p = '\0';
 
   return size - x.n - 1;
+}
+
+int ape_ptrtype(ape_State *A, ape_Object *obj) {
+  return (int)hash(checktype(A, obj, APE_TPTR));
 }
 
 void *ape_toptr(ape_State *A, ape_Object *obj) {
@@ -1589,12 +1594,6 @@ EVAL:
   return res;
 }
 
-static char readfp(ape_State *A, void *udata) {
-  int ch = fgetc((FILE *)udata);
-  unused(A);
-  return ch == EOF ? '\0' : ch;
-}
-
 static char readbuffer(ape_State *A, void *udata) {
   CharPtrInt *x = (CharPtrInt *)udata;
   int ch = '\0';
@@ -1616,6 +1615,12 @@ ape_Object *ape_readstring(ape_State *A, const char *str) {
   x.n = (int)strlen(str);
 
   return ape_read(A, readbuffer, &x);
+}
+
+static char readfp(ape_State *A, void *udata) {
+  int ch = fgetc((FILE *)udata);
+  unused(A);
+  return ch == EOF ? '\0' : ch;
 }
 
 ape_Object *ape_readfp(ape_State *A, FILE *fp) {
