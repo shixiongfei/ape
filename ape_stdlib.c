@@ -19,24 +19,112 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
+static ape_Object *caar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, ape_car(A, ape_nextarg(A, &args)));
+}
+
 static ape_Object *cadr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
+}
+
+static ape_Object *cdar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, ape_car(A, ape_nextarg(A, &args)));
 }
 
 static ape_Object *cddr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_cdr(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
 
+static ape_Object *caaar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, caar(A, args, env));
+}
+
+static ape_Object *caadr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cadr(A, args, env));
+}
+
+static ape_Object *cadar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cdar(A, args, env));
+}
+
 static ape_Object *caddr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_car(A, cddr(A, args, env));
+}
+
+static ape_Object *cdaar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, caar(A, args, env));
+}
+
+static ape_Object *cdadr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cadr(A, args, env));
+}
+
+static ape_Object *cddar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cdar(A, args, env));
 }
 
 static ape_Object *cdddr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_cdr(A, cddr(A, args, env));
 }
 
+static ape_Object *caaaar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, caaar(A, args, env));
+}
+
+static ape_Object *caaadr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, caadr(A, args, env));
+}
+
+static ape_Object *caadar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cadar(A, args, env));
+}
+
+static ape_Object *caaddr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, caddr(A, args, env));
+}
+
+static ape_Object *cadaar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cdaar(A, args, env));
+}
+
+static ape_Object *cadadr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cdadr(A, args, env));
+}
+
+static ape_Object *caddar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_car(A, cddar(A, args, env));
+}
+
 static ape_Object *cadddr(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_car(A, cdddr(A, args, env));
+}
+
+static ape_Object *cdaaar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, caaar(A, args, env));
+}
+
+static ape_Object *cdaadr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, caadr(A, args, env));
+}
+
+static ape_Object *cdadar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cadar(A, args, env));
+}
+
+static ape_Object *cdaddr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, caddr(A, args, env));
+}
+
+static ape_Object *cddaar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cdaar(A, args, env));
+}
+
+static ape_Object *cddadr(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cdadr(A, args, env));
+}
+
+static ape_Object *cdddar(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_cdr(A, cddar(A, args, env));
 }
 
 static ape_Object *cddddr(ape_State *A, ape_Object *args, ape_Object *env) {
@@ -195,12 +283,20 @@ static const char reduce[] = {"                                                \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"cadr", cadr},     {"cddr", cddr},     {"caddr", caddr},
-      {"cdddr", cdddr},   {"cadddr", cadddr}, {"cddddr", cddddr},
-      {"eval", eval},     {"load", load},     {"list", list},
-      {"concat", concat}, {"length", length}, {"reverse", reverse},
-      {"nth", nth},       {"print", print},   {"gensym", gensym},
-      {"rem", rem},       {"round", round_},  {NULL, NULL}};
+      {"caar", caar},       {"cadr", cadr},     {"cdar", cdar},
+      {"cddr", cddr},       {"caaar", caaar},   {"caadr", caadr},
+      {"cadar", cadar},     {"caddr", caddr},   {"cdaar", cdaar},
+      {"cdadr", cdadr},     {"cddar", cddar},   {"cdddr", cdddr},
+      {"caaaar", caaaar},   {"caaadr", caaadr}, {"caadar", caadar},
+      {"caaddr", caaddr},   {"cadaar", cadaar}, {"cadadr", cadadr},
+      {"caddar", caddar},   {"cadddr", cadddr}, {"cdaaar", cdaaar},
+      {"cdaadr", cdaadr},   {"cdadar", cdadar}, {"cdaddr", cdaddr},
+      {"cddaar", cddaar},   {"cddadr", cddadr}, {"cdddar", cdddar},
+      {"cddddr", cddddr},   {"eval", eval},     {"load", load},
+      {"list", list},       {"concat", concat}, {"length", length},
+      {"reverse", reverse}, {"nth", nth},       {"print", print},
+      {"gensym", gensym},   {"rem", rem},       {"round", round_},
+      {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn, let, cond,   apply,  when, unless,
                           while_,   for_, map, filter, reduce, NULL};
   int gctop = ape_savegc(A);
