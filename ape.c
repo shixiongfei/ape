@@ -781,7 +781,13 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
   return symbol(A, h, name, len, 1);
 }
 
-/*                        Vector(7)
+/* Vector(7)
+ * +---------------------+----------+
+ * | +--------+--------+ |          |
+ * | | Vector | length | |          |
+ * | +--------+--------+ |          |
+ * +---------------------+----+-----+
+ *                            |
  *                      +-----+-----+
  *                   +--+     |     +--+
  *                  /   +-----+-----+   \
@@ -800,7 +806,7 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
  */
 
 static int next_power(int size) {
-  if (0 == size)
+  if (size < 2)
     return 2;
 
   /* fast check if power of two */
@@ -821,6 +827,9 @@ static int next_power(int size) {
 ape_Object *ape_vector(ape_State *A, int len) {
   ape_Object *obj;
 
+  if (len < 1)
+    ape_error(A, "vector length must greater than zero");
+
   if (len > MAXVECSIZE)
     ape_error(A, "vector too long");
 
@@ -832,26 +841,56 @@ ape_Object *ape_vector(ape_State *A, int len) {
   return obj;
 }
 
+static ape_Object **vector_place(ape_State *A, ape_Object **vec, int dim,
+                                 int pos, int build) {
+  while (1) {
+    if (isnil(*vec)) {
+      if (build)
+        *vec = ape_cons(A, &nil, &nil);
+      else
+        return NULL;
+    }
+
+    dim = dim >> 1;
+
+    if (dim < 2)
+      return pos & dim ? &cdr(*vec) : &car(*vec);
+
+    if (pos < dim)
+      vec = &car(*vec);
+    else {
+      pos -= dim;
+      vec = &cdr(*vec);
+    }
+  }
+  return NULL;
+}
+
 ape_Object *ape_vecref(ape_State *A, ape_Object *vec, int pos) {
   int len = (int)veclen(vec);
+  ape_Object **place;
 
   if (pos >= len)
     ape_error(A, "vector out of range");
 
-  len = next_power(len);
-
-  return &nil;
+  place = vector_place(A, &cdr(vec), next_power(len), pos, 0);
+  return place ? *place : &nil;
 }
 
 ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
                        ape_Object *obj) {
   int len = (int)veclen(vec);
+  ape_Object **place;
 
   if (pos >= len)
     ape_error(A, "vector out of range");
 
-  len = next_power(len);
+  place = vector_place(A, &cdr(vec), next_power(len), pos, 1);
 
+  if (!place)
+    ape_error(A, "vector place not found");
+
+  *place = obj;
   return vec;
 }
 

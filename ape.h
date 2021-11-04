@@ -15,8 +15,8 @@
 #include <stdio.h>
 
 #define APE_MAJOR 0
-#define APE_MINOR 1
-#define APE_PATCH 3
+#define APE_MINOR 2
+#define APE_PATCH 0
 
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
