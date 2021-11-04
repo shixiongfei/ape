@@ -1303,12 +1303,12 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
     if (isnil(args))                                                           \
       res = A->t;                                                              \
     else {                                                                     \
-      va = ape_checktype(A, evalarg(), APE_TNUMBER);                               \
+      va = ape_checktype(A, evalarg(), APE_TNUMBER);                           \
       if (isnil(args))                                                         \
         res = A->t;                                                            \
       else {                                                                   \
         while (!isnil(args)) {                                                 \
-          vb = ape_checktype(A, evalarg(), APE_TNUMBER);                           \
+          vb = ape_checktype(A, evalarg(), APE_TNUMBER);                       \
           if (!(number(va) op number(vb))) {                                   \
             res = &nil;                                                        \
             break;                                                             \

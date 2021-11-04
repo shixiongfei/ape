@@ -158,7 +158,7 @@ static ape_Object *number(ape_State *A, ape_Object *args, ape_Object *env) {
   }
 
   ape_tostring(A, str, buf, sizeof(buf) - 1);
-  n = strtod(buf,&p);
+  n = strtod(buf, &p);
 
   if ((int)(p - buf) != len) {
     ape_error(A, "not a number string");
