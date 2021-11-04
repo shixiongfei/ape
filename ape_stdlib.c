@@ -258,6 +258,11 @@ static ape_Object *gensym(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_gensym(A);
 }
 
+static ape_Object *make_vector(ape_State *A, ape_Object *args,
+                               ape_Object *env) {
+  return ape_vector(A, (int)ape_tointeger(A, ape_nextarg(A, &args)));
+}
+
 static ape_Object *rem(ape_State *A, ape_Object *args, ape_Object *env) {
   double a, b;
 
@@ -475,32 +480,46 @@ static const char pop[] = {"                                                   \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"caar", caar},       {"cadr", cadr},       {"cdar", cdar},
-      {"cddr", cddr},       {"caaar", caaar},     {"caadr", caadr},
-      {"cadar", cadar},     {"caddr", caddr},     {"cdaar", cdaar},
-      {"cdadr", cdadr},     {"cddar", cddar},     {"cdddr", cdddr},
-      {"caaaar", caaaar},   {"caaadr", caaadr},   {"caadar", caadar},
-      {"caaddr", caaddr},   {"cadaar", cadaar},   {"cadadr", cadadr},
-      {"caddar", caddar},   {"cadddr", cadddr},   {"cdaaar", cdaaar},
-      {"cdaadr", cdaadr},   {"cdadar", cdadar},   {"cdaddr", cdaddr},
-      {"cddaar", cddaar},   {"cddadr", cddadr},   {"cdddar", cdddar},
-      {"cddddr", cddddr},   {"unbound", unbound}, {"eval", eval},
-      {"load", load},       {"number", number},   {"string", string},
-      {"list", list},       {"concat", concat},   {"length", length},
-      {"reverse", reverse}, {"nth", nth},         {"assoc", assoc},
-      {"get", get},         {"print", print},     {"symbol", symbol},
-      {"gensym", gensym},   {"rem", rem},         {"round", round_},
-      {"nan?", nanp},       {"inf?", infp},       {"abs", abs_},
-      {"acos", acos_},      {"acosh", acosh_},    {"asin", asin_},
-      {"asinh", asinh_},    {"atan", atan_},      {"atan2", atan2_},
-      {"atanh", atanh_},    {"cos", cos_},        {"cosh", cosh_},
-      {"sin", sin_},        {"sinh", sinh_},      {"tan", tan_},
-      {"tanh", tanh_},      {"exp", exp_},        {"log", log_},
-      {"log10", log10_},    {"pow", pow_},        {"sqrt", sqrt_},
-      {"ceil", ceil_},      {"floor", floor_},    {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn,   let,  cond, apply,  when,
-                          unless,   while_, for_, map,  filter, reduce,
-                          acons,    push,   pop,  NULL};
+      {"caar", caar},       {"cadr", cadr},
+      {"cdar", cdar},       {"cddr", cddr},
+      {"caaar", caaar},     {"caadr", caadr},
+      {"cadar", cadar},     {"caddr", caddr},
+      {"cdaar", cdaar},     {"cdadr", cdadr},
+      {"cddar", cddar},     {"cdddr", cdddr},
+      {"caaaar", caaaar},   {"caaadr", caaadr},
+      {"caadar", caadar},   {"caaddr", caaddr},
+      {"cadaar", cadaar},   {"cadadr", cadadr},
+      {"caddar", caddar},   {"cadddr", cadddr},
+      {"cdaaar", cdaaar},   {"cdaadr", cdaadr},
+      {"cdadar", cdadar},   {"cdaddr", cdaddr},
+      {"cddaar", cddaar},   {"cddadr", cddadr},
+      {"cdddar", cdddar},   {"cddddr", cddddr},
+      {"unbound", unbound}, {"eval", eval},
+      {"load", load},       {"number", number},
+      {"string", string},   {"list", list},
+      {"concat", concat},   {"length", length},
+      {"reverse", reverse}, {"nth", nth},
+      {"assoc", assoc},     {"get", get},
+      {"print", print},     {"symbol", symbol},
+      {"gensym", gensym},   {"make-vector", make_vector},
+      {"rem", rem},         {"round", round_},
+      {"nan?", nanp},       {"inf?", infp},
+      {"abs", abs_},        {"acos", acos_},
+      {"acosh", acosh_},    {"asin", asin_},
+      {"asinh", asinh_},    {"atan", atan_},
+      {"atan2", atan2_},    {"atanh", atanh_},
+      {"cos", cos_},        {"cosh", cosh_},
+      {"sin", sin_},        {"sinh", sinh_},
+      {"tan", tan_},        {"tanh", tanh_},
+      {"exp", exp_},        {"log", log_},
+      {"log10", log10_},    {"pow", pow_},
+      {"sqrt", sqrt_},      {"ceil", ceil_},
+      {"floor", floor_},    {NULL, NULL},
+  };
+  const char *stdlib[] = {
+      defmacro, defn, let,    cond,   apply, when, unless, while_,
+      for_,     map,  filter, reduce, acons, push, pop,    NULL,
+  };
   int gctop = ape_savegc(A);
 
   /* c libs */

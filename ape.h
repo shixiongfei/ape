@@ -62,6 +62,7 @@ enum {
   APE_TNUMBER,
   APE_TSYMBOL,
   APE_TSTRING,
+  APE_TVECTOR,
   APE_TFUNC,
   APE_TMACRO,
   APE_TPRIM,
@@ -102,6 +103,10 @@ APE_API ape_Object *ape_string(ape_State *A, const char *str);
 APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
 APE_API ape_Object *ape_concat(ape_State *A, ape_Object *objs);
 APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
+APE_API ape_Object *ape_vector(ape_State *A, int len);
+APE_API ape_Object *ape_vecref(ape_State *A, ape_Object *vec, int pos);
+APE_API ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
+                               ape_Object *obj);
 APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
 APE_API ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype);
 APE_API ape_Object *ape_gensym(ape_State *A);

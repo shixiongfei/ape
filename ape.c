@@ -50,6 +50,9 @@ enum {
   P_SETCAR,
   P_SETCDR,
   P_TYPE,
+  P_VECTOR,
+  P_VECREF,
+  P_VECSET,
   P_EQ,
   P_LT,
   P_LTE,
@@ -63,17 +66,18 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",    "set!",  "if",         "fn",       "macro",
-    "expand", "quote", "quasiquote", "unquote",  "unquote-splicing",
-    "and",    "or",    "not",        "do",       "cons",
-    "car",    "cdr",   "set-car!",   "set-cdr!", "type",
-    "=",      "<",     "<=",         ">",        ">=",
-    "+",      "-",     "*",          "/",
+    "def",    "set!",       "if",          "fn",       "macro",
+    "expand", "quote",      "quasiquote",  "unquote",  "unquote-splicing",
+    "and",    "or",         "not",         "do",       "cons",
+    "car",    "cdr",        "set-car!",    "set-cdr!", "type",
+    "vector", "vector-ref", "vector-set!", "=",        "<",
+    "<=",     ">",          ">=",          "+",        "-",
+    "*",      "/",
 };
 
 static const char *typenames[] = {
-    "pair",     "free",  "nil",       "number",    "symbol",  "string",
-    "function", "macro", "primitive", "cfunction", "pointer",
+    "pair",   "free",     "nil",   "number",    "symbol",    "string",
+    "vector", "function", "macro", "primitive", "cfunction", "pointer",
 };
 
 typedef intptr_t slimb_t;
@@ -93,6 +97,7 @@ typedef uintptr_t limb_t;
 #define FCMARKBIT (0x4)
 #define SNMARKBIT (0x4)
 #define HASHMASK ((((limb_t)1) << (STRBUFSIZE * 8)) - 1)
+#define MAXVECSIZE (1 << 24)
 
 typedef union {
   ape_Object *o;
@@ -121,11 +126,11 @@ typedef union {
   };
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    limb_t hash : STRBUFSIZE * 8;
+    limb_t nx : STRBUFSIZE * 8;
     limb_t __ : 8;
 #else
     limb_t __ : 8;
-    limb_t hash : STRBUFSIZE * 8;
+    limb_t nx : STRBUFSIZE * 8;
 #endif
   };
 } Value;
@@ -216,7 +221,9 @@ struct ape_State {
 #define settype(x, t) (tag(x) = (t) << 4 | 1)
 
 #define isnil(x) ((x) == &nil)
-#define hash(x) ((x)->car.hash)
+#define hash(x) ((x)->car.nx)
+#define ptrtype(x) ((x)->car.nx)
+#define veclen(x) ((x)->car.nx)
 
 /* TODO: Decimal(Base-10 Number): value = coefficient * 10^exponent
  *
@@ -518,6 +525,7 @@ LOOP:
   case APE_TMACRO:
   case APE_TSYMBOL:
   case APE_TSTRING:
+  case APE_TVECTOR:
     obj = cdr(obj);
     goto LOOP;
 
@@ -542,6 +550,9 @@ int ape_length(ape_State *A, ape_Object *obj) {
       len += strcnt(obj);
     return len;
   }
+
+  if (type(obj) == APE_TVECTOR)
+    return (int)veclen(obj);
 
   return ape_error(A, "not an iteratable object");
 }
@@ -770,6 +781,80 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
   return symbol(A, h, name, len, 1);
 }
 
+/*                        Vector(7)
+ *                      +-----+-----+
+ *                   +--+     |     +--+
+ *                  /   +-----+-----+   \
+ *                 /                     \
+ *                /                       \
+ *               /                         \
+ *        +-----+-----+               +-----+-----+
+ *        |     |     |               |     |     |
+ *        +--+--+--+--+               +--+--+--+--+
+ *          /       \                   /       \
+ *         /         \                 /         \
+ *        /           \               /           \
+ * +-----+-----+ +-----+-----+ +-----+-----+ +-----+-----+
+ * |  0  |  1  | |  2  |  3  | |  4  |  5  | |  6  | nil |
+ * +-----+-----+ +-----+-----+ +-----+-----+ +-----+-----+
+ */
+
+static int next_power(int size) {
+  if (0 == size)
+    return 2;
+
+  /* fast check if power of two */
+  if (0 == (size & (size - 1)))
+    return size;
+
+  size -= 1;
+  size |= size >> 1;
+  size |= size >> 2;
+  size |= size >> 4;
+  size |= size >> 8;
+  size |= size >> 16;
+  size += 1;
+
+  return size;
+}
+
+ape_Object *ape_vector(ape_State *A, int len) {
+  ape_Object *obj;
+
+  if (len > MAXVECSIZE)
+    ape_error(A, "vector too long");
+
+  obj = alloc(A);
+  settype(obj, APE_TVECTOR);
+  veclen(obj) = len;
+  cdr(obj) = &nil;
+
+  return obj;
+}
+
+ape_Object *ape_vecref(ape_State *A, ape_Object *vec, int pos) {
+  int len = (int)veclen(vec);
+
+  if (pos >= len)
+    ape_error(A, "vector out of range");
+
+  len = next_power(len);
+
+  return &nil;
+}
+
+ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
+                       ape_Object *obj) {
+  int len = (int)veclen(vec);
+
+  if (pos >= len)
+    ape_error(A, "vector out of range");
+
+  len = next_power(len);
+
+  return vec;
+}
+
 ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
   ape_Object *obj = alloc(A);
   settype(obj, APE_TCFUNC);
@@ -781,7 +866,7 @@ ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype) {
   ape_Object *obj = alloc(A);
   settype(obj, APE_TPTR);
   cdr(obj) = (ape_Object *)ptr;
-  hash(obj) = subtype & 0xFFFF;
+  ptrtype(obj) = subtype & 0xFFFF;
   return obj;
 }
 
@@ -878,7 +963,7 @@ int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size) {
 }
 
 int ape_ptrtype(ape_State *A, ape_Object *obj) {
-  return (int)hash(ape_checktype(A, obj, APE_TPTR));
+  return (int)ptrtype(ape_checktype(A, obj, APE_TPTR));
 }
 
 void *ape_toptr(ape_State *A, ape_Object *obj) {
@@ -948,6 +1033,15 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     /* Transform: '(...) => (quote (...)) */
     return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, &nil));
 
+  case '#':
+    res = ape_read(A, fn, udata);
+
+    if (!res)
+      ape_error(A, "stray '#'");
+
+    /* Transform: #(...) => (vector ...) */
+    return ape_cons(A, A->primsyms[P_VECTOR], ape_checktype(A, res, APE_TPAIR));
+
   case '`':
     v = ape_read(A, fn, udata);
 
@@ -970,11 +1064,11 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     res = ape_cons(A, v, &nil);
 
-    /* Transform: ,@v => (unquote-splicing v) */
+    /* Transform: ,@v => (unquote-splicing (v)) */
     if (ch == '@')
       return ape_cons(A, A->primsyms[P_UNQUOTE_SPLICING], res);
 
-    /* Transform: ,v => (unquote v) */
+    /* Transform: ,v => (unquote (v)) */
     return ape_cons(A, A->primsyms[P_UNQUOTE], res);
 
   case '"':
@@ -1046,6 +1140,7 @@ static void writestr(ape_State *A, ape_WriteFunc fn, void *udata,
 void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
                int strqt) {
   char buf[APE_SYMSIZE];
+  int i, len;
 
   switch (type(obj)) {
   case APE_TNIL:
@@ -1105,6 +1200,21 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
 
     if (strqt)
       fn(A, udata, '"');
+    break;
+
+  case APE_TVECTOR:
+    writestr(A, fn, udata, "#(");
+
+    len = (int)veclen(obj);
+
+    for (i = 0; i < len; ++i) {
+      ape_write(A, ape_vecref(A, obj, i), fn, udata, 1);
+
+      if (i < (len - 1))
+        fn(A, udata, ' ');
+    }
+
+    fn(A, udata, ')');
     break;
 
   default:
@@ -1220,14 +1330,20 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
 
 #define evalarg() ape_eval(A, ape_nextarg(A, &args), env)
 
-static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
+static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env,
+                             int *cnt) {
   ape_Object *res = &nil;
   ape_Object **tail = &res;
+  int c = 0;
 
   while (!isnil(list)) {
     *tail = ape_cons(A, ape_eval(A, ape_nextarg(A, &list), env), &nil);
     tail = &cdr(*tail);
+    c += 1;
   }
+
+  if (cnt)
+    *cnt = c;
 
   return res;
 }
@@ -1447,7 +1563,7 @@ ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
   ape_Object *res, *va, *vb; /* registers */
-  int gctop;
+  int gctop, i, cnt;
 
   env = env ? env : A->env;
 
@@ -1570,6 +1686,25 @@ EVAL:
       va = evalarg();
       res = A->typesyms[type(va)];
       break;
+    case P_VECTOR:
+      va = eval_list(A, args, env, &cnt);
+      vb = ape_vector(A, cnt);
+
+      for (i = 0; i < cnt; ++i)
+        ape_vecset(A, vb, i, ape_nextarg(A, &va));
+
+      res = vb;
+      break;
+    case P_VECREF:
+      va = ape_checktype(A, evalarg(), APE_TVECTOR);
+      vb = ape_checktype(A, evalarg(), APE_TNUMBER);
+      res = ape_vecref(A, va, (int)number(vb));
+      break;
+    case P_VECSET:
+      va = ape_checktype(A, evalarg(), APE_TVECTOR);
+      vb = ape_checktype(A, evalarg(), APE_TNUMBER);
+      res = ape_vecset(A, va, (int)number(vb), evalarg());
+      break;
     case P_EQ:
       va = evalarg();
       res = ape_bool(A, ape_equal(A, va, evalarg()));
@@ -1616,13 +1751,13 @@ EVAL:
     }
     break;
   case APE_TCFUNC:
-    res = cfunc(fn)(A, eval_list(A, args, env), env);
+    res = cfunc(fn)(A, eval_list(A, args, env, NULL), env);
     break;
   case APE_TFUNC:
     va = cdr(fn); /* ((env . args) . (do ...)) */
     vb = car(va); /* (env . args)*/
 
-    args = eval_list(A, args, env);
+    args = eval_list(A, args, env, NULL);
 
     /* new local environment */
     env = ape_cons(A, &nil, car(vb));
