@@ -158,6 +158,21 @@
   (print x))
 
 
+(def pl '(x 100 y 200 z 300))
+(print "pl:" pl)
+(print "pl x:" (get pl 'x))
+(print "pl y:" (get pl 'y))
+(print "pl z:" (get pl 'z))
+(print "pl w:" (get pl 'w 400))
+
+
+(def al (acons 'x 10 (acons 'y 20 (acons 'z 30 nil))))
+(print "al:" al)
+(print "al x:" (assoc 'x al))
+(print "al y:" (assoc 'y al))
+(print "al z:" (assoc 'z al))
+
+
 (print "map 1+ =" (map (fn (x) (+ x 1))
                        '(1 2 3 4 5)))
 
