@@ -29,6 +29,10 @@
 
 (print (type (/ 10 3)))
 (print (type (/ 10 2)))
+(print (type (string 1234)))
+(print (type (string 'xyz)))
+(print (type (number "-12.34")))
+(print (type (symbol (concat "hello" "-" "world"))))
 
 (print "gensym" (gensym))
 (print "gensym" (gensym))
