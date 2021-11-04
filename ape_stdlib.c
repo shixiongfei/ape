@@ -265,12 +265,12 @@ static ape_Object *gensym(ape_State *A, ape_Object *args, ape_Object *env) {
 }
 
 static ape_Object *rem(ape_State *A, ape_Object *args, ape_Object *env) {
-  long long a, b;
+  double a, b;
 
-  a = ape_tointeger(A, ape_nextarg(A, &args));
-  b = ape_tointeger(A, ape_nextarg(A, &args));
+  a = ape_tonumber(A, ape_nextarg(A, &args));
+  b = ape_tonumber(A, ape_nextarg(A, &args));
 
-  return ape_integer(A, a % b);
+  return ape_number(A, fmod(a, b));
 }
 
 static ape_Object *round_(ape_State *A, ape_Object *args, ape_Object *env) {
@@ -289,6 +289,106 @@ static ape_Object *round_(ape_State *A, ape_Object *args, ape_Object *env) {
     return ape_number(A, (2.0 * round(y / 2.0)) / p);
 
   return ape_number(A, z / p);
+}
+
+static ape_Object *nanp(ape_State *A, ape_Object *args, ape_Object *env) {
+  if (isnan(ape_tonumber(A, ape_nextarg(A, &args))))
+    return ape_true(A);
+  return ape_nil(A);
+}
+
+static ape_Object *infp(ape_State *A, ape_Object *args, ape_Object *env) {
+  if (isinf(ape_tonumber(A, ape_nextarg(A, &args))))
+    return ape_true(A);
+  return ape_nil(A);
+}
+
+static ape_Object *abs_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, fabs(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *acos_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, acos(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *acosh_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, acosh(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *asin_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, asin(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *asinh_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, asinh(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *atan_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, atan(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *atan2_(ape_State *A, ape_Object *args, ape_Object *env) {
+  double y = ape_tonumber(A, ape_nextarg(A, &args));
+  double x = ape_tonumber(A, ape_nextarg(A, &args));
+  return ape_number(A, atan2(y, x));
+}
+
+static ape_Object *atanh_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, atanh(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *cos_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, cos(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *cosh_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, cosh(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *sin_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, sin(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *sinh_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, sinh(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *tan_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, tan(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *tanh_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, tanh(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *exp_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, exp(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *log_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, log(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *log10_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, log10(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *pow_(ape_State *A, ape_Object *args, ape_Object *env) {
+  double x = ape_tonumber(A, ape_nextarg(A, &args));
+  double y = ape_tonumber(A, ape_nextarg(A, &args));
+  return ape_number(A, pow(x, y));
+}
+
+static ape_Object *sqrt_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, sqrt(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *ceil_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, ceil(ape_tonumber(A, ape_nextarg(A, &args))));
+}
+
+static ape_Object *floor_(ape_State *A, ape_Object *args, ape_Object *env) {
+  return ape_number(A, floor(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
 static const char defmacro[] = {"                                              \
@@ -400,7 +500,14 @@ void stdlib_open(ape_State *A) {
       {"reverse", reverse}, {"nth", nth},         {"assoc", assoc},
       {"get", get},         {"print", print},     {"symbol", symbol},
       {"gensym", gensym},   {"rem", rem},         {"round", round_},
-      {NULL, NULL}};
+      {"nan?", nanp},       {"inf?", infp},       {"abs", abs_},
+      {"acos", acos_},      {"acosh", acosh_},    {"asin", asin_},
+      {"asinh", asinh_},    {"atan", atan_},      {"atan2", atan2_},
+      {"atanh", atanh_},    {"cos", cos_},        {"cosh", cosh_},
+      {"sin", sin_},        {"sinh", sinh_},      {"tan", tan_},
+      {"tanh", tanh_},      {"exp", exp_},        {"log", log_},
+      {"log10", log10_},    {"pow", pow_},        {"sqrt", sqrt_},
+      {"ceil", ceil_},      {"floor", floor_},    {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn,   let,  cond, apply,  when,
                           unless,   while_, for_, map,  filter, reduce,
                           acons,    push,   pop,  NULL};

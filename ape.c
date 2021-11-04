@@ -1270,13 +1270,6 @@ static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, res);
 }
 
-static ape_Object *check_divzero(ape_State *A, ape_Object *obj) {
-  if (number(ape_checktype(A, obj, APE_TNUMBER)) == (floatptr_t)0.0)
-    ape_error(A, "division by zero");
-
-  return obj;
-}
-
 static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   floatptr_t res;
   ape_Object *x;
@@ -1284,15 +1277,26 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   if (isnil(args))
     ape_error(A, "wrong number of operands");
 
-  x = check_divzero(A, evalarg());
+  x = ape_checktype(A, evalarg(), APE_TNUMBER);
 
   if (isnil(args))
-    return ape_number(A, (floatptr_t)1 / number(x));
+    res = (floatptr_t)1;
+  else {
+    res = number(x);
+    x = ape_checktype(A, evalarg(), APE_TNUMBER);
+  }
 
-  res = number(x);
+  do {
+    if (fabs(number(x) - 0.0) <= FP_EPSILON)
+      ape_error(A, "division by zero");
 
-  while (!isnil(args))
-    res /= number(check_divzero(A, evalarg()));
+    res /= number(x);
+
+    if (isnil(args))
+      break;
+
+    x = ape_checktype(A, evalarg(), APE_TNUMBER);
+  } while (1);
 
   return ape_number(A, res);
 }
