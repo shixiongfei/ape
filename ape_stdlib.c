@@ -152,18 +152,14 @@ static ape_Object *number(ape_State *A, ape_Object *args, ape_Object *env) {
   char *p, buf[APE_SYMSIZE] = {0};
   double n;
 
-  if (len >= APE_SYMSIZE) {
+  if (len >= APE_SYMSIZE)
     ape_error(A, "number string too long");
-    return ape_nil(A);
-  }
 
   ape_tostring(A, str, buf, sizeof(buf) - 1);
   n = strtod(buf, &p);
 
-  if ((int)(p - buf) != len) {
+  if ((int)(p - buf) != len)
     ape_error(A, "not a number string");
-    return ape_nil(A);
-  }
 
   return ape_number(A, n);
 }
@@ -251,10 +247,8 @@ static ape_Object *symbol(ape_State *A, ape_Object *args, ape_Object *env) {
   ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
   char buf[APE_SYMSIZE] = {0};
 
-  if (ape_length(A, str) >= APE_SYMSIZE) {
+  if (ape_length(A, str) >= APE_SYMSIZE)
     ape_error(A, "symbol too long");
-    return ape_nil(A);
-  }
 
   ape_tostring(A, str, buf, sizeof(buf) - 1);
   return ape_symbol(A, buf);
@@ -292,15 +286,11 @@ static ape_Object *round_(ape_State *A, ape_Object *args, ape_Object *env) {
 }
 
 static ape_Object *nanp(ape_State *A, ape_Object *args, ape_Object *env) {
-  if (isnan(ape_tonumber(A, ape_nextarg(A, &args))))
-    return ape_true(A);
-  return ape_nil(A);
+  return ape_bool(A, isnan(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
 static ape_Object *infp(ape_State *A, ape_Object *args, ape_Object *env) {
-  if (isinf(ape_tonumber(A, ape_nextarg(A, &args))))
-    return ape_true(A);
-  return ape_nil(A);
+  return ape_bool(A, isinf(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
 static ape_Object *abs_(ape_State *A, ape_Object *args, ape_Object *env) {

@@ -1287,7 +1287,7 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   }
 
   do {
-    if (fabs(number(x) - 0.0) <= FP_EPSILON)
+    if (fabs(number(x) - (floatptr_t)0) < FP_EPSILON)
       ape_error(A, "division by zero");
 
     res /= number(x);
@@ -1500,7 +1500,6 @@ EVAL:
       ape_restoregc(A, gctop);
       A->calllist = cdr(&cl);
       goto EVAL;
-      break;
     case P_FN:
     case P_MACRO:
       va = ape_cons(A, env, ape_nextarg(A, &args));
@@ -1634,14 +1633,12 @@ EVAL:
     ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
     goto EVAL;
-    break;
   case APE_TMACRO:
     expr = expand(A, fn, args);
 
     ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
     goto EVAL;
-    break;
   default:
     ape_error(A, "tried to call non-callable value");
     break;
