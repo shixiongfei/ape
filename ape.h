@@ -16,7 +16,7 @@
 
 #define APE_MAJOR 0
 #define APE_MINOR 1
-#define APE_PATCH 2
+#define APE_PATCH 3
 
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
@@ -82,6 +82,7 @@ APE_API void ape_mark(ape_State *A, ape_Object *obj);
 APE_API int ape_length(ape_State *A, ape_Object *obj);
 APE_API int ape_isnil(ape_State *A, ape_Object *obj);
 APE_API int ape_type(ape_State *A, ape_Object *obj);
+APE_API int ape_equal(ape_State *A, ape_Object *a, ape_Object *b);
 
 APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
 APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);

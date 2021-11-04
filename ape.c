@@ -556,6 +556,29 @@ int ape_type(ape_State *A, ape_Object *obj) {
   return type(obj);
 }
 
+int ape_equal(ape_State *A, ape_Object *a, ape_Object *b) {
+  unused(A);
+
+  if (a == b)
+    return 1;
+
+  if (type(a) != type(b))
+    return 0;
+
+  if (type(a) == APE_TNUMBER)
+    return fabs(number(a) - number(b)) < FP_EPSILON;
+
+  if (type(a) == APE_TSTRING) {
+    for (; !isnil(a); a = cdr(a), b = cdr(b))
+      if (car(a) != car(b))
+        return 0;
+
+    return a == b;
+  }
+
+  return 0;
+}
+
 static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
   if (type(obj) != type)
     ape_error(A, "expected %s, got %s", typenames[type], typenames[type(obj)]);
@@ -1195,27 +1218,6 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
   return car(arg);
 }
 
-static int equal(ape_Object *a, ape_Object *b) {
-  if (a == b)
-    return 1;
-
-  if (type(a) != type(b))
-    return 0;
-
-  if (type(a) == APE_TNUMBER)
-    return fabs(number(a) - number(b)) < FP_EPSILON;
-
-  if (type(a) == APE_TSTRING) {
-    for (; !isnil(a); a = cdr(a), b = cdr(b))
-      if (car(a) != car(b))
-        return 0;
-
-    return a == b;
-  }
-
-  return 0;
-}
-
 #define evalarg() ape_eval(A, ape_nextarg(A, &args), env)
 
 static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env) {
@@ -1567,30 +1569,30 @@ EVAL:
       break;
     case P_EQ:
       va = evalarg();
-      res = ape_bool(A, equal(va, evalarg()));
+      res = ape_bool(A, ape_equal(A, va, evalarg()));
       break;
     case P_LT:
       arith_compare(A, args, env, <);
 
-      if (!isnil(res) && equal(va, vb))
+      if (!isnil(res) && ape_equal(A, va, vb))
         res = &nil;
       break;
     case P_LTE:
       arith_compare(A, args, env, <);
 
-      if (isnil(res) && equal(va, vb))
+      if (isnil(res) && ape_equal(A, va, vb))
         res = A->t;
       break;
     case P_GT:
       arith_compare(A, args, env, >);
 
-      if (!isnil(res) && equal(va, vb))
+      if (!isnil(res) && ape_equal(A, va, vb))
         res = &nil;
       break;
     case P_GTE:
       arith_compare(A, args, env, >);
 
-      if (isnil(res) && equal(va, vb))
+      if (isnil(res) && ape_equal(A, va, vb))
         res = A->t;
       break;
     case P_ADD:

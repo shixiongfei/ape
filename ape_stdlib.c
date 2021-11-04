@@ -166,6 +166,35 @@ static ape_Object *nth(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_nth(A, ape_nextarg(A, &args), index);
 }
 
+static ape_Object *assoc(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Object *k = ape_nextarg(A, &args);
+  ape_Object *l = ape_nextarg(A, &args);
+  ape_Object *p;
+  
+  for (; !ape_isnil(A, l); l = ape_cdr(A, l)) {
+    p = ape_car(A, l);
+
+    if (ape_equal(A, k, ape_car(A, p)))
+      return p;
+  }
+
+  return ape_nil(A);
+}
+
+static ape_Object *get(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Object *l = ape_nextarg(A, &args);
+  ape_Object *k = ape_nextarg(A, &args);
+
+  while (!ape_isnil(A, l)) {
+    if (ape_equal(A, k, ape_car(A, l)))
+      return ape_car(A, ape_cdr(A, l));
+
+    l = ape_cdr(A, ape_cdr(A, l));
+  }
+
+  return !ape_isnil(A, args) ? ape_nextarg(A, &args) : ape_nil(A);
+}
+
 static ape_Object *print(ape_State *A, ape_Object *args, ape_Object *env) {
   while (!ape_isnil(A, args)) {
     ape_writefp(A, ape_nextarg(A, &args), stdout);
@@ -285,6 +314,10 @@ static const char reduce[] = {"                                                \
     (set! accum (proc accum x)))                                               \
   accum)"};
 
+static const char acons[] = {"                                                 \
+(defn acons (a b l)                                                            \
+  (cons (cons a b) l))"};
+
 static const char push[] = {"                                                  \
 (defmacro push (val place)                                                     \
   `(set! ,place (cons ,val ,place)))"};
@@ -310,11 +343,12 @@ void stdlib_open(ape_State *A) {
       {"cddddr", cddddr}, {"unbound", unbound}, {"eval", eval},
       {"load", load},     {"list", list},       {"concat", concat},
       {"length", length}, {"reverse", reverse}, {"nth", nth},
-      {"print", print},   {"gensym", gensym},   {"rem", rem},
-      {"round", round_},  {NULL, NULL}};
-  const char *stdlib[] = {defmacro, defn,   let,    cond, apply,
-                          when,     unless, while_, for_, map,
-                          filter,   reduce, push,   pop,  NULL};
+      {"assoc", assoc},   {"get", get},         {"print", print},
+      {"gensym", gensym}, {"rem", rem},         {"round", round_},
+      {NULL, NULL}};
+  const char *stdlib[] = {defmacro, defn,   let,  cond, apply,  when,
+                          unless,   while_, for_, map,  filter, reduce,
+                          acons,    push,   pop,  NULL};
   int gctop = ape_savegc(A);
 
   /* c libs */
