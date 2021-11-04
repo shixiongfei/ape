@@ -32,6 +32,8 @@
 
 #define APE_API extern
 
+#define APE_SYMSIZE 64
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -84,6 +86,7 @@ APE_API int ape_isnil(ape_State *A, ape_Object *obj);
 APE_API int ape_type(ape_State *A, ape_Object *obj);
 APE_API int ape_equal(ape_State *A, ape_Object *a, ape_Object *b);
 
+APE_API ape_Object *ape_checktype(ape_State *A, ape_Object *obj, int type);
 APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
 APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_cdr(ape_State *A, ape_Object *obj);

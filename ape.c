@@ -579,7 +579,7 @@ int ape_equal(ape_State *A, ape_Object *a, ape_Object *b) {
   return 0;
 }
 
-static ape_Object *checktype(ape_State *A, ape_Object *obj, int type) {
+ape_Object *ape_checktype(ape_State *A, ape_Object *obj, int type) {
   if (type(obj) != type)
     ape_error(A, "expected %s, got %s", typenames[type], typenames[type(obj)]);
   return obj;
@@ -595,22 +595,22 @@ ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr) {
 ape_Object *ape_car(ape_State *A, ape_Object *obj) {
   if (isnil(obj))
     return obj;
-  return car(checktype(A, obj, APE_TPAIR));
+  return car(ape_checktype(A, obj, APE_TPAIR));
 }
 
 ape_Object *ape_cdr(ape_State *A, ape_Object *obj) {
   if (isnil(obj))
     return obj;
-  return cdr(checktype(A, obj, APE_TPAIR));
+  return cdr(ape_checktype(A, obj, APE_TPAIR));
 }
 
 ape_Object *ape_setcar(ape_State *A, ape_Object *obj, ape_Object *car) {
-  car(checktype(A, obj, APE_TPAIR)) = car;
+  car(ape_checktype(A, obj, APE_TPAIR)) = car;
   return obj;
 }
 
 ape_Object *ape_setcdr(ape_State *A, ape_Object *obj, ape_Object *cdr) {
-  cdr(checktype(A, obj, APE_TPAIR)) = cdr;
+  cdr(ape_checktype(A, obj, APE_TPAIR)) = cdr;
   return obj;
 }
 
@@ -694,7 +694,7 @@ ape_Object *ape_concat(ape_State *A, ape_Object *objs) {
   int i, size;
 
   while (!isnil(objs)) {
-    str = checktype(A, ape_nextarg(A, &objs), APE_TSTRING);
+    str = ape_checktype(A, ape_nextarg(A, &objs), APE_TSTRING);
 
     while (!isnil(str)) {
       size = strcnt(str);
@@ -796,8 +796,8 @@ ape_Object *ape_gensym(ape_State *A) {
 ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
   ape_Object *res = &nil;
 
-  for (obj = checktype(A, obj, APE_TPAIR); !isnil(obj); obj = cdr(obj))
-    res = ape_cons(A, car(checktype(A, obj, APE_TPAIR)), res);
+  for (obj = ape_checktype(A, obj, APE_TPAIR); !isnil(obj); obj = cdr(obj))
+    res = ape_cons(A, car(ape_checktype(A, obj, APE_TPAIR)), res);
 
   /* TODO: string reverse */
 
@@ -842,11 +842,11 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
 }
 
 long long ape_tointeger(ape_State *A, ape_Object *obj) {
-  return (long long)number(checktype(A, obj, APE_TNUMBER));
+  return (long long)number(ape_checktype(A, obj, APE_TNUMBER));
 }
 
 double ape_tonumber(ape_State *A, ape_Object *obj) {
-  return number(checktype(A, obj, APE_TNUMBER));
+  return number(ape_checktype(A, obj, APE_TNUMBER));
 }
 
 typedef struct {
@@ -878,11 +878,11 @@ int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size) {
 }
 
 int ape_ptrtype(ape_State *A, ape_Object *obj) {
-  return (int)hash(checktype(A, obj, APE_TPTR));
+  return (int)hash(ape_checktype(A, obj, APE_TPTR));
 }
 
 void *ape_toptr(ape_State *A, ape_Object *obj) {
-  return cdr(checktype(A, obj, APE_TPTR));
+  return cdr(ape_checktype(A, obj, APE_TPTR));
 }
 
 static ape_Object rparen = {0};
@@ -892,7 +892,7 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   ape_Object *v, *res, **tail;
   floatptr_t n;
   int ch, top;
-  char buf[64] = {0}, *p;
+  char buf[APE_SYMSIZE] = {0}, *p;
 
   /* get next character */
   ch = A->next_char ? A->next_char : fn(A, udata);
@@ -1045,7 +1045,7 @@ static void writestr(ape_State *A, ape_WriteFunc fn, void *udata,
 
 void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
                int strqt) {
-  char buf[32];
+  char buf[APE_SYMSIZE];
 
   switch (type(obj)) {
   case APE_TNIL:
@@ -1153,7 +1153,7 @@ ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
   ape_Object *frame, *x, *p = &nil;
 
   env = env ? env : A->env;
-  sym = checktype(A, sym, APE_TSYMBOL);
+  sym = ape_checktype(A, sym, APE_TSYMBOL);
 
   /* Try to find in environment */
   for (; !isnil(env); env = cdr(env)) {
@@ -1236,7 +1236,7 @@ static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
   floatptr_t res = 0;
 
   while (!isnil(args))
-    res += number(checktype(A, evalarg(), APE_TNUMBER));
+    res += number(ape_checktype(A, evalarg(), APE_TNUMBER));
 
   return ape_number(A, res);
 }
@@ -1248,7 +1248,7 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
   if (isnil(args))
     ape_error(A, "wrong number of operands");
 
-  x = checktype(A, evalarg(), APE_TNUMBER);
+  x = ape_checktype(A, evalarg(), APE_TNUMBER);
 
   if (isnil(args))
     return ape_number(A, -number(x));
@@ -1256,7 +1256,7 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
   res = number(x);
 
   while (!isnil(args))
-    res -= number(checktype(A, evalarg(), APE_TNUMBER));
+    res -= number(ape_checktype(A, evalarg(), APE_TNUMBER));
 
   return ape_number(A, res);
 }
@@ -1265,13 +1265,13 @@ static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
   floatptr_t res = 1;
 
   while (!isnil(args))
-    res *= number(checktype(A, evalarg(), APE_TNUMBER));
+    res *= number(ape_checktype(A, evalarg(), APE_TNUMBER));
 
   return ape_number(A, res);
 }
 
 static ape_Object *check_divzero(ape_State *A, ape_Object *obj) {
-  if (number(checktype(A, obj, APE_TNUMBER)) == (floatptr_t)0.0)
+  if (number(ape_checktype(A, obj, APE_TNUMBER)) == (floatptr_t)0.0)
     ape_error(A, "division by zero");
 
   return obj;
@@ -1303,12 +1303,12 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
     if (isnil(args))                                                           \
       res = A->t;                                                              \
     else {                                                                     \
-      va = checktype(A, evalarg(), APE_TNUMBER);                               \
+      va = ape_checktype(A, evalarg(), APE_TNUMBER);                               \
       if (isnil(args))                                                         \
         res = A->t;                                                            \
       else {                                                                   \
         while (!isnil(args)) {                                                 \
-          vb = checktype(A, evalarg(), APE_TNUMBER);                           \
+          vb = ape_checktype(A, evalarg(), APE_TNUMBER);                           \
           if (!(number(va) op number(vb))) {                                   \
             res = &nil;                                                        \
             break;                                                             \
@@ -1373,9 +1373,9 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
         ape_Object *arg = ape_nextarg(A, &args);
 
         arg = quasiquote(A, ape_cons(A, arg, &nil), env);
-        arg = car(checktype(A, arg, APE_TPAIR));
+        arg = car(ape_checktype(A, arg, APE_TPAIR));
 
-        obj = checktype(A, ape_eval(A, arg, env), APE_TPAIR);
+        obj = ape_checktype(A, ape_eval(A, arg, env), APE_TPAIR);
 
         for (; !isnil(obj); obj = cdr(obj)) {
           /* (x . y) => (x y) */
@@ -1396,7 +1396,7 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
 
         if (type(arg) == APE_TPAIR) {
           arg = quasiquote(A, ape_cons(A, arg, &nil), env);
-          arg = car(checktype(A, arg, APE_TPAIR));
+          arg = car(ape_checktype(A, arg, APE_TPAIR));
         }
 
         obj = ape_eval(A, arg, env);
@@ -1480,11 +1480,11 @@ EVAL:
   case APE_TPRIM:
     switch (prim(fn)) {
     case P_DEF:
-      va = checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      va = ape_checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
       res = ape_def(A, va, evalarg(), env);
       break;
     case P_SET:
-      va = checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      va = ape_checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
       res = ape_set(A, va, evalarg(), env);
       break;
     case P_IF:
@@ -1507,7 +1507,7 @@ EVAL:
       break;
     case P_EXPAND:
       va = evalarg();
-      vb = checktype(A, ape_eval(A, car(va), env), APE_TMACRO);
+      vb = ape_checktype(A, ape_eval(A, car(va), env), APE_TMACRO);
       res = expand(A, vb, cdr(va));
       break;
     case P_QUOTE:

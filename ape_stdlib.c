@@ -11,6 +11,7 @@
 
 #include <float.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "ape.h"
 
@@ -145,6 +146,46 @@ static ape_Object *load(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_load(A, filename, env);
 }
 
+static ape_Object *number(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
+  int len = ape_length(A, str);
+  char *p, buf[APE_SYMSIZE] = {0};
+  double n;
+
+  if (len >= APE_SYMSIZE) {
+    ape_error(A, "number string too long");
+    return ape_nil(A);
+  }
+
+  ape_tostring(A, str, buf, sizeof(buf) - 1);
+  n = strtod(buf,&p);
+
+  if ((int)(p - buf) != len) {
+    ape_error(A, "not a number string");
+    return ape_nil(A);
+  }
+
+  return ape_number(A, n);
+}
+
+static ape_Object *string(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Object *obj = ape_nextarg(A, &args);
+  char buf[APE_SYMSIZE] = {0};
+
+  switch (ape_type(A, obj)) {
+  case APE_TSTRING:
+    return obj;
+  case APE_TNUMBER:
+  case APE_TSYMBOL:
+    ape_tostring(A, obj, buf, sizeof(buf) - 1);
+    return ape_string(A, buf);
+  default:
+    ape_error(A, "type cannot convert to string");
+    break;
+  }
+  return ape_nil(A);
+}
+
 static ape_Object *list(ape_State *A, ape_Object *args, ape_Object *env) {
   return args;
 }
@@ -170,7 +211,7 @@ static ape_Object *assoc(ape_State *A, ape_Object *args, ape_Object *env) {
   ape_Object *k = ape_nextarg(A, &args);
   ape_Object *l = ape_nextarg(A, &args);
   ape_Object *p;
-  
+
   for (; !ape_isnil(A, l); l = ape_cdr(A, l)) {
     p = ape_car(A, l);
 
@@ -204,6 +245,19 @@ static ape_Object *print(ape_State *A, ape_Object *args, ape_Object *env) {
   }
   printf("\n");
   return ape_nil(A);
+}
+
+static ape_Object *symbol(ape_State *A, ape_Object *args, ape_Object *env) {
+  ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
+  char buf[APE_SYMSIZE] = {0};
+
+  if (ape_length(A, str) >= APE_SYMSIZE) {
+    ape_error(A, "symbol too long");
+    return ape_nil(A);
+  }
+
+  ape_tostring(A, str, buf, sizeof(buf) - 1);
+  return ape_symbol(A, buf);
 }
 
 static ape_Object *gensym(ape_State *A, ape_Object *args, ape_Object *env) {
@@ -331,20 +385,21 @@ static const char pop[] = {"                                                   \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"caar", caar},     {"cadr", cadr},       {"cdar", cdar},
-      {"cddr", cddr},     {"caaar", caaar},     {"caadr", caadr},
-      {"cadar", cadar},   {"caddr", caddr},     {"cdaar", cdaar},
-      {"cdadr", cdadr},   {"cddar", cddar},     {"cdddr", cdddr},
-      {"caaaar", caaaar}, {"caaadr", caaadr},   {"caadar", caadar},
-      {"caaddr", caaddr}, {"cadaar", cadaar},   {"cadadr", cadadr},
-      {"caddar", caddar}, {"cadddr", cadddr},   {"cdaaar", cdaaar},
-      {"cdaadr", cdaadr}, {"cdadar", cdadar},   {"cdaddr", cdaddr},
-      {"cddaar", cddaar}, {"cddadr", cddadr},   {"cdddar", cdddar},
-      {"cddddr", cddddr}, {"unbound", unbound}, {"eval", eval},
-      {"load", load},     {"list", list},       {"concat", concat},
-      {"length", length}, {"reverse", reverse}, {"nth", nth},
-      {"assoc", assoc},   {"get", get},         {"print", print},
-      {"gensym", gensym}, {"rem", rem},         {"round", round_},
+      {"caar", caar},       {"cadr", cadr},       {"cdar", cdar},
+      {"cddr", cddr},       {"caaar", caaar},     {"caadr", caadr},
+      {"cadar", cadar},     {"caddr", caddr},     {"cdaar", cdaar},
+      {"cdadr", cdadr},     {"cddar", cddar},     {"cdddr", cdddr},
+      {"caaaar", caaaar},   {"caaadr", caaadr},   {"caadar", caadar},
+      {"caaddr", caaddr},   {"cadaar", cadaar},   {"cadadr", cadadr},
+      {"caddar", caddar},   {"cadddr", cadddr},   {"cdaaar", cdaaar},
+      {"cdaadr", cdaadr},   {"cdadar", cdadar},   {"cdaddr", cdaddr},
+      {"cddaar", cddaar},   {"cddadr", cddadr},   {"cdddar", cdddar},
+      {"cddddr", cddddr},   {"unbound", unbound}, {"eval", eval},
+      {"load", load},       {"number", number},   {"string", string},
+      {"list", list},       {"concat", concat},   {"length", length},
+      {"reverse", reverse}, {"nth", nth},         {"assoc", assoc},
+      {"get", get},         {"print", print},     {"symbol", symbol},
+      {"gensym", gensym},   {"rem", rem},         {"round", round_},
       {NULL, NULL}};
   const char *stdlib[] = {defmacro, defn,   let,  cond, apply,  when,
                           unless,   while_, for_, map,  filter, reduce,
