@@ -353,7 +353,6 @@ static double collect_garbage(ape_State *A) {
       A->freelist = obj;
     }
   }
-
   return (double)marked_count / ((double)A->chunks_count * CHUNKSIZE);
 }
 
@@ -718,7 +717,6 @@ ape_Object *ape_concat(ape_State *A, ape_Object *objs) {
       str = cdr(str);
     }
   }
-
   return obj;
 }
 
@@ -737,7 +735,6 @@ static int strleq(ape_Object *obj, const char *str, int len) {
 
     obj = cdr(obj);
   }
-
   return isnil(obj) && j == len;
 }
 
@@ -917,6 +914,7 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
     res = ape_cons(A, car(ape_checktype(A, obj, APE_TPAIR)), res);
 
   /* TODO: string reverse */
+  /* TODO: vector reverse */
 
   return res;
 }
@@ -935,7 +933,7 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
     return car(obj);
 
   case APE_TSTRING:
-    while (idx > 0) {
+    while (idx >= 0) {
       cnt = strcnt(obj);
 
       if (cnt == 0 || idx < cnt)
@@ -967,7 +965,6 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
     ape_error(A, "not an iteratable object");
     break;
   }
-
   return &nil;
 }
 
@@ -1163,7 +1160,6 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     return ape_symbol(A, buf);
   }
-
   return NULL;
 }
 
@@ -1577,7 +1573,6 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
     *tail = ape_cons(A, obj, &nil);
     tail = &cdr(*tail);
   }
-
   return res;
 }
 
@@ -1869,7 +1864,6 @@ static char readbuffer(ape_State *A, void *udata) {
     ch = *x->p++;
     x->n--;
   }
-
   return ch;
 }
 

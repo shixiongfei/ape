@@ -215,6 +215,32 @@ static ape_Object *string(ape_State *A, int argc, ape_Object *args,
   return ape_nil(A);
 }
 
+static ape_Object *string_tolist(ape_State *A, int argc, ape_Object *args,
+                                 ape_Object *env) {
+  ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
+  ape_Object *list = ape_nil(A);
+  int i = ape_length(A, str);
+  int gctop = ape_savegc(A);
+
+  while (i--) {
+    ape_restoregc(A, gctop);
+    list = ape_cons(A, ape_nth(A, str, i), list);
+  }
+  return list;
+}
+
+static ape_Object *string_tovector(ape_State *A, int argc, ape_Object *args,
+                                   ape_Object *env) {
+  ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
+  ape_Object *vec = ape_vector(A, ape_length(A, str));
+  int i;
+
+  for (i = 0; i < ape_length(A, vec); ++i)
+    ape_vecset(A, vec, i, ape_nth(A, str, i));
+
+  return vec;
+}
+
 static ape_Object *list(ape_State *A, int argc, ape_Object *args,
                         ape_Object *env) {
   return args;
@@ -253,7 +279,6 @@ static ape_Object *assoc(ape_State *A, int argc, ape_Object *args,
     if (ape_equal(A, k, ape_car(A, p)))
       return p;
   }
-
   return ape_nil(A);
 }
 
@@ -268,7 +293,6 @@ static ape_Object *get(ape_State *A, int argc, ape_Object *args,
 
     l = ape_cdr(A, ape_cdr(A, l));
   }
-
   return !ape_isnil(A, args) ? ape_nextarg(A, &args) : ape_nil(A);
 }
 
@@ -317,7 +341,6 @@ static ape_Object *vector_tolist(ape_State *A, int argc, ape_Object *args,
     ape_restoregc(A, gctop);
     list = ape_cons(A, ape_nth(A, vec, i), list);
   }
-
   return list;
 }
 
@@ -608,6 +631,8 @@ void stdlib_open(ape_State *A) {
       {"load", load},
       {"number", number},
       {"string", string},
+      {"string->list", string_tolist},
+      {"string->vector", string_tovector},
       {"list", list},
       {"concat", concat},
       {"length", length},
