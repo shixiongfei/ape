@@ -1076,13 +1076,13 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, &nil));
 
   case '#':
-    res = ape_read(A, fn, udata);
+    v = ape_read(A, fn, udata);
 
-    if (!res)
+    if (!v)
       ape_error(A, "stray '#'");
 
     /* Transform: #(...) => (vector ...) */
-    return ape_cons(A, A->primsyms[P_VECTOR], ape_checktype(A, res, APE_TPAIR));
+    return ape_cons(A, A->primsyms[P_VECTOR], ape_checktype(A, v, APE_TPAIR));
 
   case '`':
     v = ape_read(A, fn, udata);

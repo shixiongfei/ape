@@ -244,7 +244,7 @@ static ape_Object *nth(ape_State *A, int argc, ape_Object *args,
 static ape_Object *assoc(ape_State *A, int argc, ape_Object *args,
                          ape_Object *env) {
   ape_Object *k = ape_nextarg(A, &args);
-  ape_Object *l = ape_nextarg(A, &args);
+  ape_Object *l = ape_checktype(A, ape_nextarg(A, &args), APE_TPAIR);
   ape_Object *p;
 
   for (; !ape_isnil(A, l); l = ape_cdr(A, l)) {
@@ -259,7 +259,7 @@ static ape_Object *assoc(ape_State *A, int argc, ape_Object *args,
 
 static ape_Object *get(ape_State *A, int argc, ape_Object *args,
                        ape_Object *env) {
-  ape_Object *l = ape_nextarg(A, &args);
+  ape_Object *l = ape_checktype(A, ape_nextarg(A, &args), APE_TPAIR);
   ape_Object *k = ape_nextarg(A, &args);
 
   while (!ape_isnil(A, l)) {
@@ -312,7 +312,6 @@ static ape_Object *vector_tolist(ape_State *A, int argc, ape_Object *args,
   ape_Object *list = ape_nil(A);
   int i = ape_length(A, vec);
   int gctop = ape_savegc(A);
-
 
   while (i--) {
     ape_restoregc(A, gctop);
