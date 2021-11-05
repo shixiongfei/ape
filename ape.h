@@ -104,7 +104,6 @@ APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
 APE_API ape_Object *ape_concat(ape_State *A, ape_Object *objs);
 APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
 APE_API ape_Object *ape_vector(ape_State *A, int len);
-APE_API ape_Object *ape_vecref(ape_State *A, ape_Object *vec, int pos);
 APE_API ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
                                ape_Object *obj);
 APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);

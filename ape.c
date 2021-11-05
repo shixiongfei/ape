@@ -51,7 +51,6 @@ enum {
   P_SETCDR,
   P_TYPE,
   P_VECTOR,
-  P_VECREF,
   P_VECSET,
   P_EQ,
   P_LT,
@@ -66,13 +65,13 @@ enum {
 };
 
 static const char *primnames[] = {
-    "def",    "set!",       "if",          "fn",       "macro",
-    "expand", "quote",      "quasiquote",  "unquote",  "unquote-splicing",
-    "and",    "or",         "not",         "do",       "cons",
-    "car",    "cdr",        "set-car!",    "set-cdr!", "type",
-    "vector", "vector-ref", "vector-set!", "=",        "<",
-    "<=",     ">",          ">=",          "+",        "-",
-    "*",      "/",
+    "def",    "set!",        "if",         "fn",       "macro",
+    "expand", "quote",       "quasiquote", "unquote",  "unquote-splicing",
+    "and",    "or",          "not",        "do",       "cons",
+    "car",    "cdr",         "set-car!",   "set-cdr!", "type",
+    "vector", "vector-set!", "=",          "<",        "<=",
+    ">",      ">=",          "+",          "-",        "*",
+    "/",
 };
 
 static const char *typenames[] = {
@@ -868,20 +867,9 @@ static ape_Object **vector_place(ape_State *A, ape_Object **vec, int dim,
   return NULL;
 }
 
-ape_Object *ape_vecref(ape_State *A, ape_Object *vec, int pos) {
-  int len = (int)veclen(vec);
-  ape_Object **place;
-
-  if (pos >= len)
-    ape_error(A, "vector out of range");
-
-  place = vector_place(A, &cdr(vec), next_power(len), pos, 0);
-  return place ? *place : &nil;
-}
-
 ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
                        ape_Object *obj) {
-  int len = (int)veclen(vec);
+  int len = (int)veclen(ape_checktype(A, vec, APE_TVECTOR));
   ape_Object **place;
 
   if (pos >= len)
@@ -931,7 +919,10 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
 }
 
 ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
-  if (type(obj) == APE_TPAIR) {
+  int cnt;
+
+  switch (type(obj)) {
+  case APE_TPAIR:
     while (idx-- > 0) {
       obj = cdr(obj);
 
@@ -939,11 +930,8 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
         ape_error(A, "index out of range");
     }
     return car(obj);
-  }
 
-  if (type(obj) == APE_TSTRING) {
-    int cnt;
-
+  case APE_TSTRING:
     while (idx > 0) {
       cnt = strcnt(obj);
 
@@ -961,9 +949,22 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
       ape_error(A, "index out of range");
 
     return ape_lstring(A, strbuf(obj) + idx, 1);
+
+  case APE_TVECTOR:
+    cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
+    ape_Object **place;
+
+    if (idx >= cnt)
+      ape_error(A, "index out of range");
+
+    place = vector_place(A, &cdr(obj), next_power(cnt), idx, 0);
+    return place ? *place : &nil;
+
+  default:
+    ape_error(A, "not an iteratable object");
+    break;
   }
 
-  ape_error(A, "not an iteratable object");
   return &nil;
 }
 
@@ -1249,7 +1250,7 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
     len = (int)veclen(obj);
 
     for (i = 0; i < len; ++i) {
-      ape_write(A, ape_vecref(A, obj, i), fn, udata, 1);
+      ape_write(A, ape_nth(A, obj, i), fn, udata, 1);
 
       if (i < (len - 1))
         fn(A, udata, ' ');
@@ -1740,11 +1741,6 @@ EVAL:
         ape_vecset(A, vb, i, ape_nextarg(A, &va));
 
       res = vb;
-      break;
-    case P_VECREF:
-      va = ape_checktype(A, evalarg(), APE_TVECTOR);
-      vb = ape_checktype(A, evalarg(), APE_TNUMBER);
-      res = ape_vecref(A, va, (int)number(vb));
       break;
     case P_VECSET:
       va = ape_checktype(A, evalarg(), APE_TVECTOR);
