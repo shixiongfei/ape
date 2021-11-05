@@ -40,9 +40,9 @@ extern "C" {
 
 typedef struct ape_Object ape_Object;
 typedef struct ape_State ape_State;
-typedef ape_Object *(*ape_CFunc)(ape_State *A, ape_Object *args,
+typedef ape_Object *(*ape_CFunc)(ape_State *A, int argc, ape_Object *args,
                                  ape_Object *env);
-
+typedef void (*ape_MemoryFunc)(ape_State *A, ape_Object *obj);
 typedef void (*ape_ErrorFunc)(ape_State *A, const char *errmsg, ape_Object *cl);
 typedef void (*ape_WriteFunc)(ape_State *A, void *udata, char ch);
 typedef char (*ape_ReadFunc)(ape_State *A, void *udata);
@@ -51,8 +51,8 @@ typedef void *(*ape_Alloc)(void *ud, void *ptr, size_t size);
 
 typedef struct {
   ape_ErrorFunc error;
-  ape_CFunc mark;
-  ape_CFunc gc;
+  ape_MemoryFunc mark;
+  ape_MemoryFunc gc;
 } ape_Handlers;
 
 enum {

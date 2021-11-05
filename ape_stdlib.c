@@ -20,133 +20,165 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
-static ape_Object *caar(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *caar(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_car(A, ape_car(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *cadr(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *cadr(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *cdar(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *cdar(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_cdr(A, ape_car(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *cddr(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *cddr(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_cdr(A, ape_cdr(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *caaar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, caar(A, args, env));
+static ape_Object *caaar(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_car(A, caar(A, argc, args, env));
 }
 
-static ape_Object *caadr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cadr(A, args, env));
+static ape_Object *caadr(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_car(A, cadr(A, argc, args, env));
 }
 
-static ape_Object *cadar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cdar(A, args, env));
+static ape_Object *cadar(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_car(A, cdar(A, argc, args, env));
 }
 
-static ape_Object *caddr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cddr(A, args, env));
+static ape_Object *caddr(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_car(A, cddr(A, argc, args, env));
 }
 
-static ape_Object *cdaar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, caar(A, args, env));
+static ape_Object *cdaar(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_cdr(A, caar(A, argc, args, env));
 }
 
-static ape_Object *cdadr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cadr(A, args, env));
+static ape_Object *cdadr(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_cdr(A, cadr(A, argc, args, env));
 }
 
-static ape_Object *cddar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cdar(A, args, env));
+static ape_Object *cddar(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_cdr(A, cdar(A, argc, args, env));
 }
 
-static ape_Object *cdddr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cddr(A, args, env));
+static ape_Object *cdddr(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return ape_cdr(A, cddr(A, argc, args, env));
 }
 
-static ape_Object *caaaar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, caaar(A, args, env));
+static ape_Object *caaaar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, caaar(A, argc, args, env));
 }
 
-static ape_Object *caaadr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, caadr(A, args, env));
+static ape_Object *caaadr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, caadr(A, argc, args, env));
 }
 
-static ape_Object *caadar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cadar(A, args, env));
+static ape_Object *caadar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, cadar(A, argc, args, env));
 }
 
-static ape_Object *caaddr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, caddr(A, args, env));
+static ape_Object *caaddr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, caddr(A, argc, args, env));
 }
 
-static ape_Object *cadaar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cdaar(A, args, env));
+static ape_Object *cadaar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, cdaar(A, argc, args, env));
 }
 
-static ape_Object *cadadr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cdadr(A, args, env));
+static ape_Object *cadadr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, cdadr(A, argc, args, env));
 }
 
-static ape_Object *caddar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cddar(A, args, env));
+static ape_Object *caddar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, cddar(A, argc, args, env));
 }
 
-static ape_Object *cadddr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_car(A, cdddr(A, args, env));
+static ape_Object *cadddr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_car(A, cdddr(A, argc, args, env));
 }
 
-static ape_Object *cdaaar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, caaar(A, args, env));
+static ape_Object *cdaaar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, caaar(A, argc, args, env));
 }
 
-static ape_Object *cdaadr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, caadr(A, args, env));
+static ape_Object *cdaadr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, caadr(A, argc, args, env));
 }
 
-static ape_Object *cdadar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cadar(A, args, env));
+static ape_Object *cdadar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, cadar(A, argc, args, env));
 }
 
-static ape_Object *cdaddr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, caddr(A, args, env));
+static ape_Object *cdaddr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, caddr(A, argc, args, env));
 }
 
-static ape_Object *cddaar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cdaar(A, args, env));
+static ape_Object *cddaar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, cdaar(A, argc, args, env));
 }
 
-static ape_Object *cddadr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cdadr(A, args, env));
+static ape_Object *cddadr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, cdadr(A, argc, args, env));
 }
 
-static ape_Object *cdddar(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cddar(A, args, env));
+static ape_Object *cdddar(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, cddar(A, argc, args, env));
 }
 
-static ape_Object *cddddr(ape_State *A, ape_Object *args, ape_Object *env) {
-  return ape_cdr(A, cdddr(A, args, env));
+static ape_Object *cddddr(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_cdr(A, cdddr(A, argc, args, env));
 }
 
-static ape_Object *unbound(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *unbound(ape_State *A, int argc, ape_Object *args,
+                           ape_Object *env) {
   return ape_unbound(A, ape_nextarg(A, &args), env, 1);
 }
 
-static ape_Object *eval(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *eval(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_eval(A, ape_nextarg(A, &args), env);
 }
 
-static ape_Object *load(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *load(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   char filename[260] = {0};
   ape_tostring(A, ape_nextarg(A, &args), filename, sizeof(filename) - 1);
   return ape_load(A, filename, env);
 }
 
-static ape_Object *number(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *number(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
   int len = ape_length(A, str);
   char *p, buf[APE_SYMSIZE] = {0};
@@ -164,7 +196,8 @@ static ape_Object *number(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, n);
 }
 
-static ape_Object *string(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *string(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   ape_Object *obj = ape_nextarg(A, &args);
   char buf[APE_SYMSIZE] = {0};
 
@@ -182,28 +215,34 @@ static ape_Object *string(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_nil(A);
 }
 
-static ape_Object *list(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *list(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return args;
 }
 
-static ape_Object *concat(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *concat(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_concat(A, args);
 }
 
-static ape_Object *length(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *length(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_integer(A, ape_length(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *reverse(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *reverse(ape_State *A, int argc, ape_Object *args,
+                           ape_Object *env) {
   return ape_reverse(A, ape_nextarg(A, &args));
 }
 
-static ape_Object *nth(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *nth(ape_State *A, int argc, ape_Object *args,
+                       ape_Object *env) {
   int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
   return ape_nth(A, ape_nextarg(A, &args), index);
 }
 
-static ape_Object *assoc(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *assoc(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   ape_Object *k = ape_nextarg(A, &args);
   ape_Object *l = ape_nextarg(A, &args);
   ape_Object *p;
@@ -218,7 +257,8 @@ static ape_Object *assoc(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_nil(A);
 }
 
-static ape_Object *get(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *get(ape_State *A, int argc, ape_Object *args,
+                       ape_Object *env) {
   ape_Object *l = ape_nextarg(A, &args);
   ape_Object *k = ape_nextarg(A, &args);
 
@@ -232,7 +272,8 @@ static ape_Object *get(ape_State *A, ape_Object *args, ape_Object *env) {
   return !ape_isnil(A, args) ? ape_nextarg(A, &args) : ape_nil(A);
 }
 
-static ape_Object *print(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *print(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   while (!ape_isnil(A, args)) {
     ape_writefp(A, ape_nextarg(A, &args), stdout);
 
@@ -243,7 +284,8 @@ static ape_Object *print(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_nil(A);
 }
 
-static ape_Object *symbol(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *symbol(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   ape_Object *str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
   char buf[APE_SYMSIZE] = {0};
 
@@ -254,16 +296,18 @@ static ape_Object *symbol(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_symbol(A, buf);
 }
 
-static ape_Object *gensym(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *gensym(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_gensym(A);
 }
 
-static ape_Object *make_vector(ape_State *A, ape_Object *args,
+static ape_Object *make_vector(ape_State *A, int argc, ape_Object *args,
                                ape_Object *env) {
   return ape_vector(A, (int)ape_tointeger(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object *rem(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *rem(ape_State *A, int argc, ape_Object *args,
+                       ape_Object *env) {
   double a, b;
 
   a = ape_tonumber(A, ape_nextarg(A, &args));
@@ -272,7 +316,8 @@ static ape_Object *rem(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, fmod(a, b));
 }
 
-static ape_Object *round_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *round_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   double x = ape_tonumber(A, ape_nextarg(A, &args));
   int n = ape_isnil(A, args) ? 0 : (int)ape_tointeger(A, ape_nextarg(A, &args));
   double p, y, z;
@@ -290,99 +335,122 @@ static ape_Object *round_(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, z / p);
 }
 
-static ape_Object *nanp(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *nanp(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_bool(A, isnan(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *infp(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *infp(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_bool(A, isinf(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *abs_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *abs_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_number(A, fabs(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *acos_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *acos_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, acos(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *acosh_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *acosh_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_number(A, acosh(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *asin_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *asin_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, asin(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *asinh_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *asinh_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_number(A, asinh(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *atan_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *atan_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, atan(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *atan2_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *atan2_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   double y = ape_tonumber(A, ape_nextarg(A, &args));
   double x = ape_tonumber(A, ape_nextarg(A, &args));
   return ape_number(A, atan2(y, x));
 }
 
-static ape_Object *atanh_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *atanh_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_number(A, atanh(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *cos_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *cos_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_number(A, cos(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *cosh_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *cosh_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, cosh(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *sin_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *sin_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_number(A, sin(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *sinh_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *sinh_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, sinh(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *tan_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *tan_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_number(A, tan(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *tanh_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *tanh_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, tanh(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *exp_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *exp_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_number(A, exp(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *log_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *log_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   return ape_number(A, log(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *log10_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *log10_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_number(A, log10(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *pow_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *pow_(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
   double x = ape_tonumber(A, ape_nextarg(A, &args));
   double y = ape_tonumber(A, ape_nextarg(A, &args));
   return ape_number(A, pow(x, y));
 }
 
-static ape_Object *sqrt_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *sqrt_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, sqrt(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *ceil_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *ceil_(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
   return ape_number(A, ceil(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
-static ape_Object *floor_(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object *floor_(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
   return ape_number(A, floor(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 

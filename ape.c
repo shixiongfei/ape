@@ -347,7 +347,7 @@ static double collect_garbage(ape_State *A) {
       }
 
       if (type(obj) == APE_TPTR && A->handlers.gc)
-        A->handlers.gc(A, obj, A->env);
+        A->handlers.gc(A, obj);
 
       settype(obj, APE_TFREE);
       cdr(obj) = A->freelist;
@@ -531,7 +531,7 @@ LOOP:
 
   case APE_TPTR:
     if (A->handlers.mark)
-      A->handlers.mark(A, obj, A->env);
+      A->handlers.mark(A, obj);
     break;
   }
 }
@@ -1377,19 +1377,19 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
 #define evalarg() ape_eval(A, ape_nextarg(A, &args), env)
 
 static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env,
-                             int *cnt) {
+                             int *argc) {
   ape_Object *res = &nil;
   ape_Object **tail = &res;
-  int c = 0;
+  int cnt = 0;
 
   while (!isnil(list)) {
     *tail = ape_cons(A, ape_eval(A, ape_nextarg(A, &list), env), &nil);
     tail = &cdr(*tail);
-    c += 1;
+    cnt += 1;
   }
 
-  if (cnt)
-    *cnt = c;
+  if (argc)
+    *argc = cnt;
 
   return res;
 }
@@ -1609,7 +1609,7 @@ ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env) {
   ape_Object *fn, *args;
   ape_Object cl;
   ape_Object *res, *va, *vb; /* registers */
-  int gctop, i, cnt;
+  int gctop, argc, i;
 
   env = env ? env : A->env;
 
@@ -1733,10 +1733,10 @@ EVAL:
       res = A->typesyms[type(va)];
       break;
     case P_VECTOR:
-      va = eval_list(A, args, env, &cnt);
-      vb = ape_vector(A, cnt);
+      va = eval_list(A, args, env, &argc);
+      vb = ape_vector(A, argc);
 
-      for (i = 0; i < cnt; ++i)
+      for (i = 0; i < argc; ++i)
         ape_vecset(A, vb, i, ape_nextarg(A, &va));
 
       res = vb;
@@ -1797,7 +1797,8 @@ EVAL:
     }
     break;
   case APE_TCFUNC:
-    res = cfunc(fn)(A, eval_list(A, args, env, NULL), env);
+    va = eval_list(A, args, env, &argc);
+    res = cfunc(fn)(A, argc, va, env);
     break;
   case APE_TFUNC:
     va = cdr(fn); /* ((env . args) . (do ...)) */
