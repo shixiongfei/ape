@@ -97,8 +97,6 @@ typedef uintptr_t limb_t;
 #define SNMARKBIT (0x4)
 #define HASHMASK ((((limb_t)1) << (STRBUFSIZE * 8)) - 1)
 #define MAXVECSIZE (1 << 24)
-#define HTSIZE 64
-#define HTMASK (HTSIZE - 1)
 
 typedef union {
   ape_Object *o;
@@ -197,9 +195,7 @@ struct ape_State {
 
   ape_Object *calllist;
   ape_Object *freelist;
-  /* Make the symbol list shorter,
-     but the principle is the same as the list */
-  ape_Object *symlist[HTSIZE];
+  ape_Object *symlist;
   ape_Object *t;
   ape_Object *env;
 
@@ -331,9 +327,7 @@ static double collect_garbage(ape_State *A) {
   for (i = 0; i < A->gcstack_idx; i++)
     ape_mark(A, A->gcstack[i]);
 
-  for (i = 0; i < HTSIZE; ++i)
-    ape_mark(A, A->symlist[i]);
-
+  ape_mark(A, A->symlist);
   ape_mark(A, A->env);
 
   /* sweep and unmark */
@@ -394,10 +388,7 @@ static ape_State *ape_init(ape_State *A) {
   /* init lists */
   A->calllist = &nil;
   A->freelist = &nil;
-
-  for (i = 0; i < HTSIZE; ++i)
-    A->symlist[i] = &nil;
-
+  A->symlist = &nil;
   A->env = &nil;
 
   /* init symbol id */
@@ -760,7 +751,7 @@ static ape_Object *symbol(ape_State *A, limb_t h, const char *name, int len,
   cdr(obj) = ape_lstring(A, name, len);
 
   if (pushlist)
-    A->symlist[h & HTMASK] = ape_cons(A, obj, A->symlist[h & HTMASK]);
+    A->symlist = ape_cons(A, obj, A->symlist);
 
   return obj;
 }
@@ -781,7 +772,7 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
   limb_t h = fast_hash(name, len);
 
   /* try to find in symlist */
-  for (obj = A->symlist[h & HTMASK]; !isnil(obj); obj = cdr(obj))
+  for (obj = A->symlist; !isnil(obj); obj = cdr(obj))
     if (hash(car(obj)) == h && strleq(cdr(car(obj)), name, len))
       return car(obj);
 
