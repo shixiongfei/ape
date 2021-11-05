@@ -97,6 +97,8 @@ typedef uintptr_t limb_t;
 #define SNMARKBIT (0x4)
 #define HASHMASK ((((limb_t)1) << (STRBUFSIZE * 8)) - 1)
 #define MAXVECSIZE (1 << 24)
+#define HTSIZE 64
+#define HTMASK (HTSIZE - 1)
 
 typedef union {
   ape_Object *o;
@@ -195,7 +197,9 @@ struct ape_State {
 
   ape_Object *calllist;
   ape_Object *freelist;
-  ape_Object *symlist;
+  /* Make the symbol list shorter,
+     but the principle is the same as the list */
+  ape_Object *symlist[HTSIZE];
   ape_Object *t;
   ape_Object *env;
 
@@ -327,7 +331,9 @@ static double collect_garbage(ape_State *A) {
   for (i = 0; i < A->gcstack_idx; i++)
     ape_mark(A, A->gcstack[i]);
 
-  ape_mark(A, A->symlist);
+  for (i = 0; i < HTSIZE; ++i)
+    ape_mark(A, A->symlist[i]);
+
   ape_mark(A, A->env);
 
   /* sweep and unmark */
@@ -385,6 +391,15 @@ extern void stdlib_open(ape_State *A);
 static ape_State *ape_init(ape_State *A) {
   int i, top = ape_savegc(A);
 
+  /* init lists */
+  A->calllist = &nil;
+  A->freelist = &nil;
+
+  for (i = 0; i < HTSIZE; ++i)
+    A->symlist[i] = &nil;
+
+  A->env = &nil;
+
   /* init symbol id */
   A->symid = (unsigned int)((uintptr_t)A >> 16); /* random seed */
   A->symid = ((A->symid * 214013L + 2531011L) >> 16) & 0x01ff;
@@ -431,12 +446,6 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
   /* init allocator */
   A->alloc = alloc;
   A->ud = ud;
-
-  /* init lists */
-  A->calllist = &nil;
-  A->freelist = &nil;
-  A->symlist = &nil;
-  A->env = &nil;
 
   return ape_init(A);
 }
@@ -751,7 +760,7 @@ static ape_Object *symbol(ape_State *A, limb_t h, const char *name, int len,
   cdr(obj) = ape_lstring(A, name, len);
 
   if (pushlist)
-    A->symlist = ape_cons(A, obj, A->symlist);
+    A->symlist[h & HTMASK] = ape_cons(A, obj, A->symlist[h & HTMASK]);
 
   return obj;
 }
@@ -761,7 +770,7 @@ static limb_t fast_hash(const char *str, int len) {
   int i;
 
   for (i = 0; i < len; ++i)
-    h = (h * 33 + str[i]) & HASHMASK;
+    h = ((h << 5) + h + str[i]) & HASHMASK;
 
   return h;
 }
@@ -772,7 +781,7 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
   limb_t h = fast_hash(name, len);
 
   /* try to find in symlist */
-  for (obj = A->symlist; !isnil(obj); obj = cdr(obj))
+  for (obj = A->symlist[h & HTMASK]; !isnil(obj); obj = cdr(obj))
     if (hash(car(obj)) == h && strleq(cdr(car(obj)), name, len))
       return car(obj);
 
