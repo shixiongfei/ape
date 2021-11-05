@@ -781,7 +781,7 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
   return symbol(A, h, name, len, 1);
 }
 
-/* Vector(7)
+/*              Vector(7)
  * +---------------------+----------+
  * | +--------+--------+ |          |
  * | | Vector | length | |          |
@@ -845,9 +845,11 @@ static ape_Object **vector_place(ape_State *A, ape_Object **vec, int dim,
                                  int pos, int build) {
   while (1) {
     if (isnil(*vec)) {
-      if (build)
+      if (build) {
+        int gctop = ape_savegc(A);
         *vec = ape_cons(A, &nil, &nil);
-      else
+        ape_restoregc(A, gctop);
+      } else
         return NULL;
     }
 
@@ -1251,6 +1253,11 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
 
       if (i < (len - 1))
         fn(A, udata, ' ');
+
+      if (len > 20 && i == 9 && i < len - 10) {
+        writestr(A, fn, udata, "... ");
+        i = len - 11;
+      }
     }
 
     fn(A, udata, ')');
