@@ -267,6 +267,11 @@ static ape_Object *nth(ape_State *A, int argc, ape_Object *args,
   return ape_nth(A, ape_nextarg(A, &args), index);
 }
 
+static ape_Object *append(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return ape_append(A, args);
+}
+
 static ape_Object *assoc(ape_State *A, int argc, ape_Object *args,
                          ape_Object *env) {
   ape_Object *k = ape_nextarg(A, &args);
@@ -638,6 +643,7 @@ void stdlib_open(ape_State *A) {
       {"length", length},
       {"reverse", reverse},
       {"nth", nth},
+      {"append", append},
       {"assoc", assoc},
       {"get", get},
       {"print", print},

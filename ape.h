@@ -111,6 +111,7 @@ APE_API ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype);
 APE_API ape_Object *ape_gensym(ape_State *A);
 APE_API ape_Object *ape_reverse(ape_State *A, ape_Object *obj);
 APE_API ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx);
+APE_API ape_Object *ape_append(ape_State *A, ape_Object *objs);
 
 APE_API long long ape_tointeger(ape_State *A, ape_Object *obj);
 APE_API double ape_tonumber(ape_State *A, ape_Object *obj);
