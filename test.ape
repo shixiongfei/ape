@@ -10,11 +10,15 @@
 
 (print (length '(1 2 3 4 5)))
 (print (length "Hello, World!"))
+(print (length #(1 2 3 4 5)))
 
 (print (nth 1 '(1 2 3 4 5)))
 (print (nth 1 "Hello, World!"))
+(print (nth 1 #(1 2 3 4 5)))
 
 (print (reverse '(1 2 3 4 5)))
+(print (list->vector '(1 2 3 4 5)))
+(print (vector->list #(1 2 3 4 5)))
 
 (print (car '(1 2 3 4 5)))
 (print (cdr '(1 2 3 4 5)))
