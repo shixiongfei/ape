@@ -19,6 +19,8 @@
 (print (reverse '(1 2 3 4 5)))
 (print (list->vector '(1 2 3 4 5)))
 (print (vector->list #(1 2 3 4 5)))
+(print (string->list "HelloWorld"))
+(print (string->vector "HelloWorld"))
 
 (print (car '(1 2 3 4 5)))
 (print (cdr '(1 2 3 4 5)))
