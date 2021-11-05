@@ -380,6 +380,10 @@ static ape_Object *alloc(ape_State *A) {
   return obj;
 }
 
+static ape_Object *create_env(ape_State *A, ape_Object *parent) {
+  return ape_cons(A, &nil, parent);
+}
+
 extern void stdlib_open(ape_State *A);
 
 static ape_State *ape_init(ape_State *A) {
@@ -396,7 +400,7 @@ static ape_State *ape_init(ape_State *A) {
   A->symid = ((A->symid * 214013L + 2531011L) >> 16) & 0x01ff;
 
   /* global environment */
-  A->env = ape_cons(A, &nil, &nil);
+  A->env = create_env(A, &nil);
 
   /* init objects */
   A->t = ape_symbol(A, "true");
@@ -1599,7 +1603,7 @@ static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
   head = car(body);  /* (env . args) */
 
   /* arguments environment */
-  env = ape_cons(A, &nil, car(head));
+  env = create_env(A, car(head));
   args_binds(A, cdr(head), args, env);
 
   /* generate code by macro */
@@ -1803,7 +1807,7 @@ EVAL:
     args = eval_list(A, args, env, NULL);
 
     /* new local environment */
-    env = ape_cons(A, &nil, car(vb));
+    env = create_env(A, car(vb));
     args_binds(A, cdr(vb), args, env);
 
     expr = cdr(va); /* do block */
