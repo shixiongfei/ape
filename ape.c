@@ -393,14 +393,13 @@ static ape_State *ape_init(ape_State *A) {
   A->calllist = &nil;
   A->freelist = &nil;
   A->symlist = &nil;
-  A->env = &nil;
+
+  /* global environment */
+  A->env = create_env(A, &nil);
 
   /* init symbol id */
   A->symid = (unsigned int)((uintptr_t)A >> 16); /* random seed */
   A->symid = ((A->symid * 214013L + 2531011L) >> 16) & 0x01ff;
-
-  /* global environment */
-  A->env = create_env(A, &nil);
 
   /* init objects */
   A->t = ape_symbol(A, "true");
