@@ -684,6 +684,28 @@ static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
   return tail;
 }
 
+static int string_ref(ape_State *A, ape_Object *str, int idx) {
+  int cnt;
+
+  while (idx >= 0) {
+    cnt = strcnt(str);
+
+    if (cnt == 0 || idx < cnt)
+      break;
+
+    str = cdr(str);
+    idx -= cnt;
+
+    if (isnil(str))
+      ape_error(A, "index out of range");
+  }
+
+  if (cnt == 0)
+    ape_error(A, "index out of range");
+
+  return strbuf(str)[idx];
+}
+
 ape_Object *ape_string(ape_State *A, const char *str) {
   return ape_lstring(A, str, (int)strlen(str));
 }
@@ -909,12 +931,36 @@ ape_Object *ape_gensym(ape_State *A) {
 
 ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
   ape_Object *res = &nil;
+  ape_Object *tail;
+  int i, len;
 
-  for (obj = ape_checktype(A, obj, APE_TPAIR); !isnil(obj); obj = cdr(obj))
-    res = ape_cons(A, car(ape_checktype(A, obj, APE_TPAIR)), res);
+  switch (type(obj)) {
+  case APE_TPAIR:
+    for (; !isnil(obj); obj = cdr(obj))
+      res = ape_cons(A, car(ape_checktype(A, obj, APE_TPAIR)), res);
+    break;
 
-  /* TODO: string reverse */
-  /* TODO: vector reverse */
+  case APE_TSTRING:
+    len = ape_length(A, obj);
+    res = build_string(A, NULL, 0);
+    tail = res;
+
+    for (i = 0; i < len; ++i)
+      tail = build_string(A, tail, string_ref(A, obj, len - i - 1));
+    break;
+
+  case APE_TVECTOR:
+    len = ape_length(A, obj);
+    res = ape_vector(A, len);
+
+    for (i = 0; i < len; ++i)
+      ape_vecset(A, res, i, ape_nth(A, obj, len - i - 1));
+    break;
+
+  default:
+    ape_error(A, "not an iteratable object");
+    break;
+  }
 
   return res;
 }
@@ -933,23 +979,8 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
     return car(obj);
 
   case APE_TSTRING:
-    while (idx >= 0) {
-      cnt = strcnt(obj);
-
-      if (cnt == 0 || idx < cnt)
-        break;
-
-      obj = cdr(obj);
-      idx -= cnt;
-
-      if (isnil(obj))
-        ape_error(A, "index out of range");
-    }
-
-    if (cnt == 0)
-      ape_error(A, "index out of range");
-
-    return ape_lstring(A, strbuf(obj) + idx, 1);
+    cnt = string_ref(A, obj, idx);
+    return ape_lstring(A, (const char *)&cnt, 1);
 
   case APE_TVECTOR:
     cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
