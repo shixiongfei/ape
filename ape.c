@@ -966,8 +966,6 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
 }
 
 ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
-  int cnt;
-
   switch (type(obj)) {
   case APE_TPAIR:
     while (idx-- > 0) {
@@ -978,12 +976,13 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
     }
     return car(obj);
 
-  case APE_TSTRING:
-    cnt = string_ref(A, obj, idx);
-    return ape_lstring(A, (const char *)&cnt, 1);
+  case APE_TSTRING: {
+    char ch = (char)string_ref(A, obj, idx);
+    return ape_lstring(A, &ch, 1);
+  }
 
-  case APE_TVECTOR:
-    cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
+  case APE_TVECTOR: {
+    int cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
     ape_Object **place;
 
     if (idx >= cnt)
@@ -991,6 +990,7 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
 
     place = vector_place(A, &cdr(obj), next_power(cnt), idx, 0);
     return place ? *place : &nil;
+  }
 
   default:
     ape_error(A, "not an iteratable object");
