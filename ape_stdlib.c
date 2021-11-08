@@ -509,6 +509,65 @@ static ape_Object *floor_(ape_State *A, int argc, ape_Object *args,
   return ape_number(A, floor(ape_tonumber(A, ape_nextarg(A, &args))));
 }
 
+static ape_Object *istype(ape_State *A, ape_Object *obj, int type) {
+  return ape_bool(A, ape_type(A, obj) == type);
+}
+
+static ape_Object *nilp(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
+  return ape_bool(A, ape_isnil(A, ape_nextarg(A, &args)));
+}
+
+static ape_Object *pairp(ape_State *A, int argc, ape_Object *args,
+                         ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TPAIR);
+}
+
+static ape_Object *numberp(ape_State *A, int argc, ape_Object *args,
+                           ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TNUMBER);
+}
+
+static ape_Object *symbolp(ape_State *A, int argc, ape_Object *args,
+                           ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+}
+
+static ape_Object *stringp(ape_State *A, int argc, ape_Object *args,
+                           ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TSTRING);
+}
+
+static ape_Object *vectorp(ape_State *A, int argc, ape_Object *args,
+                           ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TVECTOR);
+}
+
+static ape_Object *fnp(ape_State *A, int argc, ape_Object *args,
+                       ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TFUNC);
+}
+
+static ape_Object *macrop(ape_State *A, int argc, ape_Object *args,
+                          ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TMACRO);
+}
+
+static ape_Object *primitivep(ape_State *A, int argc, ape_Object *args,
+                              ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TPRIM);
+}
+
+static ape_Object *cfnp(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TCFUNC);
+}
+
+static ape_Object *ptrp(ape_State *A, int argc, ape_Object *args,
+                        ape_Object *env) {
+  return istype(A, ape_nextarg(A, &args), APE_TPTR);
+}
+
 static const char defmacro[] = {"                                              \
 (def defmacro (macro (name args . body)                                        \
   `(def ,name (macro ,args ,@body))))"};
@@ -677,6 +736,17 @@ void stdlib_open(ape_State *A) {
       {"sqrt", sqrt_},
       {"ceil", ceil_},
       {"floor", floor_},
+      {"nil?", nilp},
+      {"pair?", pairp},
+      {"number?", numberp},
+      {"symbol?", symbolp},
+      {"string?", stringp},
+      {"vector?", vectorp},
+      {"fn?", fnp},
+      {"macro?", macrop},
+      {"primitive?", primitivep},
+      {"cfn?", cfnp},
+      {"ptr?", ptrp},
       {NULL, NULL},
   };
   const char *stdlib[] = {

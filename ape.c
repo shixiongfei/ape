@@ -961,7 +961,6 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
     ape_error(A, "not an iteratable object");
     break;
   }
-
   return res;
 }
 
