@@ -1335,16 +1335,16 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
  */
 
 static ape_Object **getbound(ape_Object *sym, ape_Object *env, int recur) {
-  ape_Object *x, **frame = NULL;
+  ape_Object *bound, **frame = NULL;
 
   /* Try to find in environment */
   for (; !isnil(env); env = cdr(env)) {
     frame = &car(env);
 
     for (; !isnil(*frame); frame = &cdr(*frame)) {
-      x = car(*frame);
+      bound = car(*frame);
 
-      if (car(x) == sym)
+      if (car(bound) == sym)
         return frame;
     }
 
