@@ -95,7 +95,7 @@ typedef uintptr_t limb_t;
 #define GCMARKBIT (0x2)
 #define FCMARKBIT (0x4)
 #define SNMARKBIT (0x4)
-#define HASHMASK ((((limb_t)1) << (STRBUFSIZE * 8)) - 1)
+#define HASHMASK ((1 << 16) - 1)
 #define MAXVECSIZE (1 << 24)
 
 typedef union {
@@ -783,9 +783,9 @@ static limb_t fast_hash(const char *str, int len) {
   int i;
 
   for (i = 0; i < len; ++i)
-    h = ((h << 5) + h + str[i]) & HASHMASK;
+    h = (h << 5) + h + str[i];
 
-  return h;
+  return h & HASHMASK;
 }
 
 ape_Object *ape_symbol(ape_State *A, const char *name) {
@@ -809,9 +809,9 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
  * | +--------+--------+ |          |
  * +---------------------+----+-----+
  *                            |
- *                      +-----+-----+
- *                   +--+     |     +--+
- *                  /   +-----+-----+   \
+ *                   +--------+--------+
+ *                   +        |        +
+ *                  /+--------+--------+\
  *                 /                     \
  *                /                       \
  *               /                         \
@@ -1363,7 +1363,7 @@ ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
 
   frame = getbound(sym, env, recur);
 
-  if (!isnil(*frame)) {
+  if (frame && !isnil(*frame)) {
     bound = car(*frame);
     *frame = cdr(*frame);
     return cdr(bound);
@@ -1397,7 +1397,7 @@ ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
 
   frame = getbound(sym, env, 1);
 
-  if (isnil(*frame))
+  if (!frame || isnil(*frame))
     ape_error(A, "unbound variables cannot be set");
 
   bound = car(*frame);
@@ -1665,7 +1665,7 @@ EVAL:
 
     frame = getbound(expr, env, 1);
 
-    if (isnil(*frame))
+    if (!frame || isnil(*frame))
       ape_error(A, "unbound variables");
 
     bound = car(*frame);
