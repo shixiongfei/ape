@@ -1334,79 +1334,74 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
  * +--------+--------+     +--------+--------+
  */
 
-static ape_Object *getbound(ape_Object *sym, ape_Object *env, int recur) {
-  ape_Object *frame, *x;
+static ape_Object **getbound(ape_Object *sym, ape_Object *env, int recur) {
+  ape_Object *x, **frame = NULL;
 
   /* Try to find in environment */
   for (; !isnil(env); env = cdr(env)) {
-    frame = car(env);
+    frame = &car(env);
 
-    for (; !isnil(frame); frame = cdr(frame)) {
-      x = car(frame);
+    for (; !isnil(*frame); frame = &cdr(*frame)) {
+      x = car(*frame);
 
       if (car(x) == sym)
-        return x;
+        return frame;
     }
 
     if (!recur)
-      return &nil;
+      return frame;
   }
-  return &nil;
+  return frame;
 }
 
 ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
                         int recur) {
-  ape_Object *frame, *x, *p = &nil;
+  ape_Object **frame, *bound;
 
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
 
-  /* Try to find in environment */
-  for (; !isnil(env); env = cdr(env)) {
-    frame = car(env);
+  frame = getbound(sym, env, recur);
 
-    for (; !isnil(frame); p = frame, frame = cdr(frame)) {
-      x = car(frame);
-
-      if (car(x) == sym) {
-        if (isnil(p))
-          car(env) = cdr(frame);
-        else
-          cdr(p) = cdr(frame);
-
-        return cdr(x);
-      }
-    }
-
-    if (!recur)
-      return &nil;
+  if (!isnil(*frame)) {
+    bound = car(*frame);
+    *frame = cdr(*frame);
+    return cdr(bound);
   }
   return &nil;
 }
 
 ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
                     ape_Object *env) {
-  ape_Object *var;
+  ape_Object **frame, *bound;
 
   env = env ? env : A->env;
-  var = getbound(sym, env, 0);
+  sym = ape_checktype(A, sym, APE_TSYMBOL);
 
-  if (!isnil(var))
+  frame = getbound(sym, env, 0);
+
+  if (!isnil(*frame))
     ape_error(A, "variables cannot be redefined");
 
-  var = ape_cons(A, sym, val);
-  car(env) = ape_cons(A, var, car(env));
+  bound = ape_cons(A, sym, val);
+  *frame = ape_cons(A, bound, &nil);
   return val;
 }
 
 ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
                     ape_Object *env) {
-  ape_Object *var = getbound(sym, env ? env : A->env, 1);
+  ape_Object **frame, *bound;
 
-  if (isnil(var))
+  env = env ? env : A->env;
+  sym = ape_checktype(A, sym, APE_TSYMBOL);
+
+  frame = getbound(sym, env, 1);
+
+  if (isnil(*frame))
     ape_error(A, "unbound variables cannot be set");
 
-  cdr(var) = val;
+  bound = car(*frame);
+  cdr(bound) = val;
   return val;
 }
 
@@ -1643,8 +1638,10 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
 static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
   ape_Object *body, *head, *env;
 
-  body = cdr(macro); /* ((env . args) . (do ...)) */
-  head = car(body);  /* (env . args) */
+  /* ((env . args) . (do ...)) */
+  body = cdr(ape_checktype(A, macro, APE_TMACRO));
+  /* (env . args) */
+  head = car(body);
 
   /* arguments environment */
   env = create_env(A, car(head));
@@ -1664,14 +1661,17 @@ ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env) {
 
 EVAL:
   if (type(expr) == APE_TSYMBOL) {
-    ape_Object *var = getbound(expr, env, 1);
+    ape_Object **frame, *bound;
 
-    if (isnil(var))
+    frame = getbound(expr, env, 1);
+
+    if (isnil(*frame))
       ape_error(A, "unbound variables");
 
+    bound = car(*frame);
     /* Prevent local variables from being accidentally GC */
-    ape_pushgc(A, var);
-    return cdr(var);
+    ape_pushgc(A, bound);
+    return cdr(bound);
   }
 
   if (type(expr) != APE_TPAIR)
@@ -1695,11 +1695,11 @@ EVAL:
   case APE_TPRIM:
     switch (prim(fn)) {
     case P_DEF:
-      va = ape_checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      va = ape_nextarg(A, &args);
       res = ape_def(A, va, evalarg(), env);
       break;
     case P_SET:
-      va = ape_checktype(A, ape_nextarg(A, &args), APE_TSYMBOL);
+      va = ape_nextarg(A, &args);
       res = ape_set(A, va, evalarg(), env);
       break;
     case P_IF:
@@ -1721,7 +1721,7 @@ EVAL:
       break;
     case P_EXPAND:
       va = evalarg();
-      vb = ape_checktype(A, ape_eval(A, car(va), env), APE_TMACRO);
+      vb = ape_eval(A, car(va), env);
       res = expand(A, vb, cdr(va));
       break;
     case P_QUOTE:
@@ -1791,7 +1791,7 @@ EVAL:
       res = vb;
       break;
     case P_VECSET:
-      va = ape_checktype(A, evalarg(), APE_TVECTOR);
+      va = evalarg();
       vb = ape_checktype(A, evalarg(), APE_TNUMBER);
       res = ape_vecset(A, va, (int)number(vb), evalarg());
       break;
