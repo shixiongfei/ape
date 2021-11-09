@@ -1334,7 +1334,10 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
  * +--------+--------+     +--------+--------+
  */
 
-static ape_Object **getbound(ape_Object *sym, ape_Object *env, int recur) {
+#define ENV_RECUR 0x1
+#define ENV_CREATE 0x2
+
+static ape_Object **getbound(ape_Object *sym, ape_Object *env, int flags) {
   ape_Object *bound, **frame = NULL;
 
   /* Try to find in environment */
@@ -1348,7 +1351,7 @@ static ape_Object **getbound(ape_Object *sym, ape_Object *env, int recur) {
         return frame;
     }
 
-    if (!recur)
+    if (!(flags & ENV_RECUR))
       return frame;
   }
   return frame;
@@ -1361,7 +1364,7 @@ ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
 
-  frame = getbound(sym, env, recur);
+  frame = getbound(sym, env, recur ? ENV_RECUR : 0);
 
   if (frame && !isnil(*frame)) {
     bound = car(*frame);
@@ -1378,7 +1381,7 @@ ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
 
-  frame = getbound(sym, env, 0);
+  frame = getbound(sym, env, ENV_CREATE);
 
   if (!isnil(*frame))
     ape_error(A, "variables cannot be redefined");
@@ -1395,7 +1398,7 @@ ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
 
-  frame = getbound(sym, env, 1);
+  frame = getbound(sym, env, ENV_RECUR);
 
   if (!frame || isnil(*frame))
     ape_error(A, "unbound variables cannot be set");
@@ -1663,7 +1666,7 @@ EVAL:
   if (type(expr) == APE_TSYMBOL) {
     ape_Object **frame, *bound;
 
-    frame = getbound(expr, env, 1);
+    frame = getbound(expr, env, ENV_RECUR);
 
     if (!frame || isnil(*frame))
       ape_error(A, "unbound variables");
