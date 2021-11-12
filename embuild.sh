@@ -9,4 +9,3 @@ fi
 mv ape.html ./bin/
 mv ape.js ./bin/
 mv ape.wasm ./bin/
-cp index.html ./bin/
