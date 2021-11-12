@@ -52,15 +52,7 @@
   </head>
   <body>
     <div id="panel">
-      <textarea id="input" spellcheck="false">
-(defn fib (n)
-  (if (<= 2 n)
-      (+ (fib (- n 1))
-         (fib (- n 2)))
-    n))
-
-(print "fib 10 =" (fib 10))
-      </textarea>
+      <textarea id="input" spellcheck="false"></textarea>
       <button id="run" onclick="run()">Run</button>
       <a href="https://github.com/shixiongfei/ape">
         <img
@@ -76,6 +68,17 @@
     </div>
     <script type="text/javascript">
       const inputElement = document.getElementById('input')
+
+      inputElement.value = [
+        '(defn fib (n)',
+        '  (if (<= 2 n)',
+        '      (+ (fib (- n 1))',
+        '         (fib (- n 2)))',
+        '    n))',
+        '',
+        '(print "fib 10 =" (fib 10))',
+        ''
+      ].join('\n')
 
       function run() {
         localStorage.setItem('apeScript', inputElement.value)
