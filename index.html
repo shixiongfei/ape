@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>The Ape Programming Language | by shixiongfei</title>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        margin: 0;
+        height: 100%;
+      }
+      #panel {
+        position: relative;
+        width: calc(100vw - 20px);
+        height: calc(100vh - 222px);
+        padding: 10px;
+        cursor: default;
+        border-bottom: 1px solid #ccc;
+      }
+      textarea {
+        padding: 10px;
+        width: calc(100vw - 44px);
+        height: calc(100vh - 246px);
+        border: 2px solid lightblue;
+        border-radius: 4px;
+        resize: none;
+      }
+      #run {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        width: 50px;
+        height: 30px;
+        border-radius: 2px;
+        outline: none;
+        border: none;
+        cursor: pointer;
+      }
+      .attachment-full {
+        position: fixed;
+        top: 0;
+        right: 0;
+      }
+      iframe {
+        width: 100%;
+        height: 200px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <textarea id="input" spellcheck="false">
+(defn fib (n)
+  (if (<= 2 n)
+      (+ (fib (- n 1))
+         (fib (- n 2)))
+    n))
+
+(print "fib 10 =" (fib 10))
+      </textarea>
+      <button id="run" onclick="run()">Run</button>
+      <a href="https://github.com/shixiongfei/ape">
+        <img
+          loading="lazy"
+          width="149"
+          height="149"
+          class="attachment-full size-full"
+          alt="Fork me on GitHub"
+          data-recalc-dims="1"
+          src="https://github.blog/wp-content/uploads/2008/12/forkme_right_green_007200.png?resize=149%2C149"
+        />
+      </a>
+    </div>
+    <script type="text/javascript">
+      const inputElement = document.getElementById('input')
+
+      function run() {
+        localStorage.setItem('apeScript', inputElement.value)
+
+        const oldIframe = document.querySelector('iframe')
+        if (oldIframe) {
+          document.body.removeChild(oldIframe)
+        }
+
+        const newIframe = document.createElement('iframe')
+        newIframe.frameBorder = '0'
+        newIframe.scroll = 'no'
+        newIframe.setAttribute('src', './ape.html')
+        document.body.appendChild(newIframe)
+      }
+    </script>
+  </body>
+</html>

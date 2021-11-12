@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Ape Shell</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      textarea {
+        width: calc(100vm - 20px);
+        height: 180px;
+        resize: none;
+        border-width: 0;
+        border: none;
+        outline: none;
+        overflow: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <textarea id="output" readonly></textarea>
+    <div id="status"></div>
+    <script type="text/javascript">
+      const outputElement = document.getElementById('output')
+      const statusElement = document.getElementById('status')
+
+      const scripts = localStorage.getItem('apeScript') || ''
+
+      var Module = {
+        preRun: function () {
+          function stdin() {
+            return null
+          }
+
+          function stdout(asciiCode) {
+            outputElement.value += String.fromCharCode(asciiCode)
+            outputElement.scrollTop = outputElement.scrollHeight
+          }
+
+          function stderr(asciiCode) {
+            return stdout(asciiCode)
+          }
+
+          FS.init(stdin, stdout, stderr)
+          FS.writeFile('./run.ape', scripts)
+        },
+        setStatus: function (text) {
+          statusElement.innerHTML = text
+
+          if (text === '') {
+            statusElement.hidden = true
+          }
+        },
+        arguments: ['./run.ape']
+      }
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
