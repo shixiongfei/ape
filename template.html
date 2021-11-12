@@ -20,10 +20,14 @@
         outline: none;
         overflow: auto;
       }
+      #status {
+        width: 100%;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
-    <div id="status">...Downloading...</div>
+    <div id="status">Downloading...</div>
     <textarea id="output" readonly></textarea>
     <script type="text/javascript">
       const outputElement = document.getElementById('output')
@@ -57,10 +61,8 @@
           }
         },
         arguments: ['./run.ape'],
-        totalDependencies: 0,
         monitorRunDependencies: function (left) {
-          this.totalDependencies = Math.max(this.totalDependencies, left)
-          Module.setStatus(left ? '...Preparing...' : 'All downloads complete')
+          Module.setStatus(left ? 'Preparing...' : 'All downloads complete')
         }
       }
     </script>
