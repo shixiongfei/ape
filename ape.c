@@ -191,7 +191,7 @@ struct ape_State {
 #define type(x) (tag(x) & 0x1 ? tag(x) >> 3 : APE_TPAIR)
 #define settype(x, t) (tag(x) = (t) << 3 | 1)
 
-#define isnil(x) ((x) == &nil)
+#define isnil(x) ((x) == nil)
 #define hash(x) ((x)->car.nx)
 #define ptrtype(x) ((x)->car.nx)
 #define veclen(x) ((x)->car.nx)
@@ -248,7 +248,8 @@ struct ape_State {
 #define stridx(x) (strbuf(x)[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
-static ape_Cell nil = {{(ape_Cell *)(APE_TNIL << 3 | 1)}, {NULL}};
+static ape_Cell nilc = {{(ape_Cell *)(APE_TNIL << 3 | 1)}, {NULL}};
+static ape_Cell *nil = &nilc;
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
   unused(ud);
@@ -596,7 +597,7 @@ static ape_Object create_object(ape_State *A) {
  */
 
 static ape_Object create_env(ape_State *A, ape_Object parent) {
-  return ape_cons(A, &nil, parent);
+  return ape_cons(A, nil, parent);
 }
 
 extern void stdlib_open(ape_State *A);
@@ -605,11 +606,11 @@ static ape_State *ape_init(ape_State *A) {
   int i, gctop = ape_savegc(A);
 
   /* init lists */
-  A->calllist = &nil;
-  A->symlist = &nil;
+  A->calllist = nil;
+  A->symlist = nil;
 
   /* global environment */
-  A->env = create_env(A, &nil);
+  A->env = create_env(A, nil);
 
   /* init symbol id */
   A->symid = (unsigned int)((uintptr_t)A >> 16); /* random seed */
@@ -675,7 +676,7 @@ static void raise_error(ape_State *A, const char *errmsg) {
   ape_Cell *cl = A->calllist;
 
   /* reset context state */
-  A->calllist = &nil;
+  A->calllist = nil;
 
   /* do error handler */
   if (A->handlers.error)
@@ -810,7 +811,7 @@ ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr) {
 }
 
 ape_Object ape_list(ape_State *A, ape_Object *objs, int cnt) {
-  ape_Object list = &nil;
+  ape_Object list = nil;
 
   while (cnt--)
     list = ape_cons(A, objs[cnt], list);
@@ -822,7 +823,7 @@ ape_Object ape_true(ape_State *A) { return A->t; }
 
 ape_Object ape_nil(ape_State *A) {
   unused(A);
-  return &nil;
+  return nil;
 }
 
 ape_Object ape_bool(ape_State *A, int b) {
@@ -844,7 +845,7 @@ static ape_Object build_string(ape_State *A, ape_Object tail, int ch) {
   int index;
 
   if (!tail || (tag(tail) & FCMARKBIT)) {
-    ape_Object obj = ape_cons(A, NULL, &nil);
+    ape_Object obj = ape_cons(A, NULL, nil);
     settype(obj, APE_TSTRING);
 
     if (!tail)
@@ -1061,7 +1062,7 @@ ape_Object ape_gensym(ape_State *A) {
 }
 
 ape_Object ape_reverse(ape_State *A, ape_Object obj) {
-  ape_Object res = &nil;
+  ape_Object res = nil;
   ape_Object tail;
   int i, len;
 
@@ -1123,18 +1124,18 @@ ape_Object ape_nth(ape_State *A, ape_Object obj, int idx) {
     }
 
     place = vector_place(cdr(obj), idx);
-    return place ? *place : &nil;
+    return place ? *place : nil;
   }
 
   default:
     ape_error(A, "not an iteratable object");
     break;
   }
-  return &nil;
+  return nil;
 }
 
 ape_Object ape_append(ape_State *A, ape_Object objs) {
-  ape_Object res = &nil;
+  ape_Object res = nil;
   ape_Object *tail = &res;
 
   while (!isnil(objs)) {
@@ -1146,7 +1147,7 @@ ape_Object ape_append(ape_State *A, ape_Object objs) {
     }
 
     while (!isnil(obj)) {
-      *tail = ape_cons(A, ape_nextarg(A, &obj), &nil);
+      *tail = ape_cons(A, ape_nextarg(A, &obj), nil);
       tail = &cdr(*tail);
     }
   }
@@ -1229,7 +1230,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     return &rparen;
 
   case '(':
-    res = &nil;
+    res = nil;
     tail = &res;
     top = ape_savegc(A);
     ape_pushgc(A, res); /* to cause error on too-deep nesting */
@@ -1245,7 +1246,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
         *tail = ape_read(A, fn, udata);
       else {
         /* proper pair */
-        *tail = ape_cons(A, v, &nil);
+        *tail = ape_cons(A, v, nil);
         tail = &cdr(*tail);
       }
       ape_restoregc(A, top);
@@ -1262,7 +1263,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     }
 
     /* Transform: '(...) => (quote (...)) */
-    return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, &nil));
+    return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, nil));
 
   case '#':
     v = ape_read(A, fn, udata);
@@ -1284,7 +1285,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     }
 
     /* Transform: `(...) => (quasiquote (...)) */
-    return ape_cons(A, A->primsyms[P_QUASIQUOTE], ape_cons(A, v, &nil));
+    return ape_cons(A, A->primsyms[P_QUASIQUOTE], ape_cons(A, v, nil));
 
   case ',':
     ch = fn(A, udata);
@@ -1299,7 +1300,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       return NULL;
     }
 
-    res = ape_cons(A, v, &nil);
+    res = ape_cons(A, v, nil);
 
     /* Transform: ,@v => (unquote-splicing (v)) */
     if (ch == '@')
@@ -1357,7 +1358,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       return ape_number(A, n);
 
     if (!strcmp(buf, "nil"))
-      return &nil;
+      return nil;
 
     return ape_symbol(A, buf);
   }
@@ -1523,7 +1524,7 @@ ape_Object ape_unbound(ape_State *A, ape_Object sym, ape_Object env,
     *frame = cdr(*frame);
     return cdr(bound);
   }
-  return &nil;
+  return nil;
 }
 
 ape_Object ape_def(ape_State *A, ape_Object sym, ape_Object val,
@@ -1541,7 +1542,7 @@ ape_Object ape_def(ape_State *A, ape_Object sym, ape_Object val,
   }
 
   bound = ape_cons(A, sym, val);
-  *frame = ape_cons(A, bound, &nil);
+  *frame = ape_cons(A, bound, nil);
   return val;
 }
 
@@ -1585,12 +1586,12 @@ ape_Object ape_nextarg(ape_State *A, ape_Object *args) {
 
 static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
                             int *argc) {
-  ape_Object res = &nil;
+  ape_Object res = nil;
   ape_Object *tail = &res;
   int cnt = 0;
 
   while (!isnil(list)) {
-    *tail = ape_cons(A, ape_eval(A, ape_nextarg(A, &list), env), &nil);
+    *tail = ape_cons(A, ape_eval(A, ape_nextarg(A, &list), env), nil);
     tail = &cdr(*tail);
     cnt += 1;
   }
@@ -1689,7 +1690,7 @@ static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
         while (!isnil(args)) {                                                 \
           vb = ape_checktype(A, evalarg(), APE_TNUMBER);                       \
           if (!(number(va) op number(vb))) {                                   \
-            res = &nil;                                                        \
+            res = nil;                                                        \
             break;                                                             \
           }                                                                    \
         }                                                                      \
@@ -1737,7 +1738,7 @@ static void args_binds(ape_State *A, ape_Object syms, ape_Object args,
 }
 
 static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
-  ape_Object res = &nil;
+  ape_Object res = nil;
   ape_Object *tail = &res;
 
   if (type(expr) != APE_TPAIR)
@@ -1753,7 +1754,7 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
       if (fn == A->primsyms[P_UNQUOTE_SPLICING]) {
         ape_Object arg = ape_nextarg(A, &args);
 
-        arg = quasiquote(A, ape_cons(A, arg, &nil), env);
+        arg = quasiquote(A, ape_cons(A, arg, nil), env);
         arg = car(ape_checktype(A, arg, APE_TPAIR));
 
         obj = ape_checktype(A, ape_eval(A, arg, env), APE_TPAIR);
@@ -1761,13 +1762,13 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
         for (; !isnil(obj); obj = cdr(obj)) {
           /* (x . y) => (x y) */
           if (type(obj) != APE_TPAIR) {
-            *tail = ape_cons(A, obj, &nil);
+            *tail = ape_cons(A, obj, nil);
             tail = &cdr(*tail);
             break;
           }
 
           /* copy list */
-          *tail = ape_cons(A, car(obj), &nil);
+          *tail = ape_cons(A, car(obj), nil);
           tail = &cdr(*tail);
         }
 
@@ -1776,7 +1777,7 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
         ape_Object arg = ape_nextarg(A, &args);
 
         if (type(arg) == APE_TPAIR) {
-          arg = quasiquote(A, ape_cons(A, arg, &nil), env);
+          arg = quasiquote(A, ape_cons(A, arg, nil), env);
           arg = car(ape_checktype(A, arg, APE_TPAIR));
         }
 
@@ -1785,7 +1786,7 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
         obj = quasiquote(A, obj, env);
     }
 
-    *tail = ape_cons(A, obj, &nil);
+    *tail = ape_cons(A, obj, nil);
     tail = &cdr(*tail);
   }
   return res;
@@ -1861,7 +1862,7 @@ EVAL:
 
   fn = ape_eval(A, car(expr), env);
   args = cdr(expr);
-  res = &nil;
+  res = nil;
 
   switch (type(fn)) {
   case APE_TPRIM:
@@ -1975,7 +1976,7 @@ EVAL:
       arith_compare(A, args, env, <);
 
       if (!isnil(res) && ape_equal(A, va, vb))
-        res = &nil;
+        res = nil;
       break;
     case P_LTE:
       arith_compare(A, args, env, <);
@@ -1987,7 +1988,7 @@ EVAL:
       arith_compare(A, args, env, >);
 
       if (!isnil(res) && ape_equal(A, va, vb))
-        res = &nil;
+        res = nil;
       break;
     case P_GTE:
       arith_compare(A, args, env, >);
@@ -2075,7 +2076,7 @@ ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
   }
 
   fclose(fp);
-  return &nil;
+  return nil;
 }
 
 static char readbuffer(ape_State *A, void *udata) {
