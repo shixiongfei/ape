@@ -22,11 +22,11 @@
 /* assumption: pointers are 32 or 64 bit,
    and float/double are IEEE binary32/binary64 */
 #if INTPTR_MAX >= INT64_MAX
-typedef double floatptr_t;
-#define FP_EPSILON DBL_EPSILON
+typedef double decimal_t;
+#define DEC_EPSILON DBL_EPSILON
 #else
-typedef float floatptr_t;
-#define FP_EPSILON FLT_EPSILON
+typedef float decimal_t;
+#define DEC_EPSILON FLT_EPSILON
 #endif
 
 enum {
@@ -79,8 +79,8 @@ static const char *typenames[] = {
     "vector", "function", "macro", "primitive", "cfunction", "pointer",
 };
 
-typedef intptr_t slimb_t;
-typedef uintptr_t limb_t;
+typedef intptr_t sword_t;
+typedef uintptr_t uword_t;
 
 #define STRBUFSIZE ((int)sizeof(ape_Cell *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
@@ -101,17 +101,17 @@ typedef uintptr_t limb_t;
 typedef union {
   ape_Cell *o;
   ape_CFunc f;
-  floatptr_t n; /* Alternatives before implementing Decimal */
-  limb_t d;     /* TODO: Decimal */
+  decimal_t n; /* Alternatives before implementing Decimal */
+  uword_t d;   /* TODO: Decimal */
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     limb_t coefficient : NUMBUFSIZE * 8;
     slimb_t exponent : EXPNBUFSIZE * 8;
     limb_t _ : 8;
 #else
-    limb_t _ : 8;
-    slimb_t exponent : EXPNBUFSIZE * 8;
-    limb_t coefficient : NUMBUFSIZE * 8;
+    uword_t _ : 8;
+    sword_t exponent : EXPNBUFSIZE * 8;
+    uword_t coefficient : NUMBUFSIZE * 8;
 #endif
   };
   struct {
@@ -128,8 +128,8 @@ typedef union {
     limb_t nx : STRBUFSIZE * 8;
     limb_t __ : 8;
 #else
-    limb_t __ : 8;
-    limb_t nx : STRBUFSIZE * 8;
+    uword_t __ : 8;
+    uword_t nx : STRBUFSIZE * 8;
 #endif
   };
 } Value;
@@ -150,7 +150,7 @@ typedef struct {
 } Stack;
 
 typedef struct {
-  limb_t semi_size;    /* semi space size */
+  uword_t semi_size;   /* semi space size */
   ape_Cell *to, *from; /* semi space differentiation */
   ape_Cell *head;      /* current head of free memory */
   Stack stack;         /* GC stack */
@@ -493,7 +493,7 @@ static double collect_garbage(ape_State *A) {
   return (double)(gc->head - gc->from) / (double)gc->semi_size;
 }
 
-static void free_heap(ape_State *A, ape_Cell *heap, limb_t heap_size) {
+static void free_heap(ape_State *A, ape_Cell *heap, uword_t heap_size) {
   ape_Cell *scan;
 
   /* Handle objects that need to be GC, such as C pointers */
@@ -507,9 +507,9 @@ static void free_heap(ape_State *A, ape_Cell *heap, limb_t heap_size) {
 static int rescale_heap(ape_State *A, int grow_size) {
   GC *gc = &A->gc;
   ape_Cell *from, *to;
-  limb_t allocated, semi_size, heap_size;
+  uword_t allocated, semi_size, heap_size;
 
-  allocated = (limb_t)(gc->head - gc->from);
+  allocated = (uword_t)(gc->head - gc->from);
   semi_size = gc->semi_size << 1;
   heap_size = gc->semi_size;
 
@@ -759,7 +759,7 @@ int ape_equal(ape_State *A, ape_Object a, ape_Object b) {
     return 0;
 
   if (type(a) == APE_TNUMBER)
-    return fabs(number(a) - number(b)) < FP_EPSILON;
+    return fabs(number(a) - number(b)) < DEC_EPSILON;
 
   if (type(a) == APE_TSTRING) {
     for (; !isnil(a); a = cdr(a), b = cdr(b))
@@ -830,13 +830,13 @@ ape_Object ape_bool(ape_State *A, int b) {
 }
 
 ape_Object ape_integer(ape_State *A, long long n) {
-  return ape_number(A, (floatptr_t)n);
+  return ape_number(A, (decimal_t)n);
 }
 
 ape_Object ape_number(ape_State *A, double n) {
   ape_Object obj = create_object(A);
   settype(obj, APE_TNUMBER);
-  number(obj) = (floatptr_t)n;
+  number(obj) = (decimal_t)n;
   return obj;
 }
 
@@ -951,7 +951,7 @@ static int streq(ape_Object obj, const char *str) {
   return strleq(obj, str, (int)strlen(str));
 }
 
-static ape_Object symbol(ape_State *A, limb_t h, const char *name, int len,
+static ape_Object symbol(ape_State *A, uword_t h, const char *name, int len,
                          int pushlist) {
   ape_Object obj = create_object(A);
 
@@ -965,8 +965,8 @@ static ape_Object symbol(ape_State *A, limb_t h, const char *name, int len,
   return obj;
 }
 
-static limb_t fast_hash(const char *str, int len) {
-  limb_t h = 5381;
+static uword_t fast_hash(const char *str, int len) {
+  uword_t h = 5381;
   int i;
 
   for (i = 0; i < len; ++i)
@@ -978,7 +978,7 @@ static limb_t fast_hash(const char *str, int len) {
 ape_Object ape_symbol(ape_State *A, const char *name) {
   ape_Object obj;
   int len = (int)strlen(name);
-  limb_t h = fast_hash(name, len);
+  uword_t h = fast_hash(name, len);
 
   /* try to find in symlist */
   for (obj = A->symlist; !isnil(obj); obj = cdr(obj))
@@ -1202,7 +1202,7 @@ static ape_Cell rparen = {0};
 static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
   ape_Object v, res, *tail;
-  floatptr_t n;
+  decimal_t n;
   int ch, top;
   char buf[APE_SYMSIZE] = {0}, *p;
 
@@ -1351,7 +1351,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     A->next_char = ch;
 
     /* try to read as number */
-    n = (floatptr_t)strtod(buf, &p);
+    n = (decimal_t)strtod(buf, &p);
 
     if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
       return ape_number(A, n);
@@ -1602,7 +1602,7 @@ static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
 }
 
 static ape_Object arith_add(ape_State *A, ape_Object args, ape_Object env) {
-  floatptr_t res = 0;
+  decimal_t res = 0;
 
   while (!isnil(args))
     res += number(ape_checktype(A, evalarg(), APE_TNUMBER));
@@ -1611,7 +1611,7 @@ static ape_Object arith_add(ape_State *A, ape_Object args, ape_Object env) {
 }
 
 static ape_Object arith_sub(ape_State *A, ape_Object args, ape_Object env) {
-  floatptr_t res;
+  decimal_t res;
   ape_Object x;
 
   if (isnil(args)) {
@@ -1633,7 +1633,7 @@ static ape_Object arith_sub(ape_State *A, ape_Object args, ape_Object env) {
 }
 
 static ape_Object arith_mul(ape_State *A, ape_Object args, ape_Object env) {
-  floatptr_t res = 1;
+  decimal_t res = 1;
 
   while (!isnil(args))
     res *= number(ape_checktype(A, evalarg(), APE_TNUMBER));
@@ -1642,7 +1642,7 @@ static ape_Object arith_mul(ape_State *A, ape_Object args, ape_Object env) {
 }
 
 static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
-  floatptr_t res;
+  decimal_t res;
   ape_Object x;
 
   if (isnil(args)) {
@@ -1653,14 +1653,14 @@ static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
   x = ape_checktype(A, evalarg(), APE_TNUMBER);
 
   if (isnil(args))
-    res = (floatptr_t)1;
+    res = (decimal_t)1;
   else {
     res = number(x);
     x = ape_checktype(A, evalarg(), APE_TNUMBER);
   }
 
   do {
-    if (fabs(number(x) - (floatptr_t)0) < FP_EPSILON) {
+    if (fabs(number(x) - (decimal_t)0) < DEC_EPSILON) {
       ape_error(A, "division by zero");
       return NULL;
     }
