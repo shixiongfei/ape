@@ -38,12 +38,12 @@
 extern "C" {
 #endif
 
-typedef struct ape_Object ape_Object;
+typedef struct ape_Cell ape_Cell, *ape_Object;
 typedef struct ape_State ape_State;
-typedef ape_Object *(*ape_CFunc)(ape_State *A, int argc, ape_Object *args,
-                                 ape_Object *env);
+typedef ape_Object (*ape_CFunc)(ape_State *A, int argc, ape_Object args,
+                                ape_Object env);
 typedef void (*ape_GCFunc)(ape_State *A, void *ptr, int subtype);
-typedef void (*ape_ErrorFunc)(ape_State *A, const char *errmsg, ape_Object *cl);
+typedef void (*ape_ErrorFunc)(ape_State *A, const char *errmsg, ape_Object cl);
 typedef void (*ape_WriteFunc)(ape_State *A, void *udata, char ch);
 typedef char (*ape_ReadFunc)(ape_State *A, void *udata);
 
@@ -76,66 +76,64 @@ APE_API void ape_close(ape_State *A);
 APE_API ape_Handlers *ape_handlers(ape_State *A);
 APE_API int ape_error(ape_State *A, const char *format, ...);
 
-APE_API void ape_pushgc(ape_State *A, ape_Object *obj);
-APE_API void ape_popgc(ape_State *A);
-
+APE_API void ape_pushgc(ape_State *A, ape_Object obj);
 APE_API void ape_restoregc(ape_State *A, int idx);
 APE_API int ape_savegc(ape_State *A);
 
-APE_API int ape_length(ape_State *A, ape_Object *obj);
-APE_API int ape_isnil(ape_State *A, ape_Object *obj);
-APE_API int ape_type(ape_State *A, ape_Object *obj);
-APE_API int ape_equal(ape_State *A, ape_Object *a, ape_Object *b);
+APE_API int ape_length(ape_State *A, ape_Object obj);
+APE_API int ape_isnil(ape_State *A, ape_Object obj);
+APE_API int ape_type(ape_State *A, ape_Object obj);
+APE_API int ape_equal(ape_State *A, ape_Object a, ape_Object b);
 
-APE_API ape_Object *ape_checktype(ape_State *A, ape_Object *obj, int type);
-APE_API ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr);
-APE_API ape_Object *ape_car(ape_State *A, ape_Object *obj);
-APE_API ape_Object *ape_cdr(ape_State *A, ape_Object *obj);
-APE_API ape_Object *ape_setcar(ape_State *A, ape_Object *obj, ape_Object *car);
-APE_API ape_Object *ape_setcdr(ape_State *A, ape_Object *obj, ape_Object *cdr);
-APE_API ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt);
-APE_API ape_Object *ape_true(ape_State *A);
-APE_API ape_Object *ape_nil(ape_State *A);
-APE_API ape_Object *ape_bool(ape_State *A, int b);
-APE_API ape_Object *ape_integer(ape_State *A, long long n);
-APE_API ape_Object *ape_number(ape_State *A, double n);
-APE_API ape_Object *ape_string(ape_State *A, const char *str);
-APE_API ape_Object *ape_lstring(ape_State *A, const char *str, int len);
-APE_API ape_Object *ape_concat(ape_State *A, ape_Object *objs);
-APE_API ape_Object *ape_symbol(ape_State *A, const char *name);
-APE_API ape_Object *ape_vector(ape_State *A, int len);
-APE_API ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
-                               ape_Object *obj);
-APE_API ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn);
-APE_API ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype);
-APE_API ape_Object *ape_gensym(ape_State *A);
-APE_API ape_Object *ape_reverse(ape_State *A, ape_Object *obj);
-APE_API ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx);
-APE_API ape_Object *ape_append(ape_State *A, ape_Object *objs);
+APE_API ape_Object ape_checktype(ape_State *A, ape_Object obj, int type);
+APE_API ape_Object ape_cons(ape_State *A, ape_Object car, ape_Object cdr);
+APE_API ape_Object ape_car(ape_State *A, ape_Object obj);
+APE_API ape_Object ape_cdr(ape_State *A, ape_Object obj);
+APE_API ape_Object ape_setcar(ape_State *A, ape_Object obj, ape_Object car);
+APE_API ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr);
+APE_API ape_Object ape_list(ape_State *A, ape_Object *objs, int cnt);
+APE_API ape_Object ape_true(ape_State *A);
+APE_API ape_Object ape_nil(ape_State *A);
+APE_API ape_Object ape_bool(ape_State *A, int b);
+APE_API ape_Object ape_integer(ape_State *A, long long n);
+APE_API ape_Object ape_number(ape_State *A, double n);
+APE_API ape_Object ape_string(ape_State *A, const char *str);
+APE_API ape_Object ape_lstring(ape_State *A, const char *str, int len);
+APE_API ape_Object ape_concat(ape_State *A, ape_Object objs);
+APE_API ape_Object ape_symbol(ape_State *A, const char *name);
+APE_API ape_Object ape_vector(ape_State *A, int len);
+APE_API ape_Object ape_vecset(ape_State *A, ape_Object vec, int pos,
+                              ape_Object obj);
+APE_API ape_Object ape_cfunc(ape_State *A, ape_CFunc fn);
+APE_API ape_Object ape_ptr(ape_State *A, void *ptr, int subtype);
+APE_API ape_Object ape_gensym(ape_State *A);
+APE_API ape_Object ape_reverse(ape_State *A, ape_Object obj);
+APE_API ape_Object ape_nth(ape_State *A, ape_Object obj, int idx);
+APE_API ape_Object ape_append(ape_State *A, ape_Object objs);
 
-APE_API long long ape_tointeger(ape_State *A, ape_Object *obj);
-APE_API double ape_tonumber(ape_State *A, ape_Object *obj);
-APE_API int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size);
-APE_API int ape_ptrtype(ape_State *A, ape_Object *obj);
-APE_API void *ape_toptr(ape_State *A, ape_Object *obj);
+APE_API long long ape_tointeger(ape_State *A, ape_Object obj);
+APE_API double ape_tonumber(ape_State *A, ape_Object obj);
+APE_API int ape_tostring(ape_State *A, ape_Object obj, char *dst, int size);
+APE_API int ape_ptrtype(ape_State *A, ape_Object obj);
+APE_API void *ape_toptr(ape_State *A, ape_Object obj);
 
-APE_API ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata);
-APE_API void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn,
+APE_API ape_Object ape_read(ape_State *A, ape_ReadFunc fn, void *udata);
+APE_API void ape_write(ape_State *A, ape_Object obj, ape_WriteFunc fn,
                        void *udata, int strqt);
 
-APE_API ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
-                                int recur);
-APE_API ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
-                            ape_Object *env);
-APE_API ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
-                            ape_Object *env);
-APE_API ape_Object *ape_nextarg(ape_State *A, ape_Object **args);
-APE_API ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env);
-APE_API ape_Object *ape_load(ape_State *A, const char *file, ape_Object *env);
+APE_API ape_Object ape_unbound(ape_State *A, ape_Object sym, ape_Object env,
+                               int recur);
+APE_API ape_Object ape_def(ape_State *A, ape_Object sym, ape_Object val,
+                           ape_Object env);
+APE_API ape_Object ape_set(ape_State *A, ape_Object sym, ape_Object val,
+                           ape_Object env);
+APE_API ape_Object ape_nextarg(ape_State *A, ape_Object *args);
+APE_API ape_Object ape_eval(ape_State *A, ape_Object expr, ape_Object env);
+APE_API ape_Object ape_load(ape_State *A, const char *file, ape_Object env);
 
-APE_API ape_Object *ape_readstring(ape_State *A, const char *str);
-APE_API ape_Object *ape_readfp(ape_State *A, FILE *fp);
-APE_API void ape_writefp(ape_State *A, ape_Object *obj, FILE *fp);
+APE_API ape_Object ape_readstring(ape_State *A, const char *str);
+APE_API ape_Object ape_readfp(ape_State *A, FILE *fp);
+APE_API void ape_writefp(ape_State *A, ape_Object obj, FILE *fp);
 
 #ifdef __cplusplus
 };

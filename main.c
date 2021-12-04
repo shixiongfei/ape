@@ -17,8 +17,8 @@
 static long prompt = 0;
 static jmp_buf toplevel;
 
-static void on_error(ape_State *A, const char *errmsg, ape_Object *calllist) {
-  ape_Object *cl = calllist;
+static void on_error(ape_State *A, const char *errmsg, ape_Object calllist) {
+  ape_Object cl = calllist;
 
   fprintf(stderr, "error: %s\n", errmsg);
 
@@ -40,7 +40,7 @@ static int do_file(const char *filename) {
 
 static int do_repl(void) {
   ape_State *A = ape_newstate(NULL, NULL);
-  ape_Object *expr;
+  ape_Object expr;
   int gctop;
 
   ape_handlers(A)->error = on_error;

@@ -82,7 +82,7 @@ static const char *typenames[] = {
 typedef intptr_t slimb_t;
 typedef uintptr_t limb_t;
 
-#define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
+#define STRBUFSIZE ((int)sizeof(ape_Cell *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
 
 #if INTPTR_MAX >= INT64_MAX
@@ -90,7 +90,7 @@ typedef uintptr_t limb_t;
 #else
 #define EXPNBUFSIZE 1
 #endif
-#define NUMBUFSIZE ((int)sizeof(ape_Object *) - EXPNBUFSIZE - 1)
+#define NUMBUFSIZE ((int)sizeof(ape_Cell *) - EXPNBUFSIZE - 1)
 
 #define FCMARKBIT (1 << 2) /* Full Chars */
 #define HASHMASK ((1 << 16) - 1)
@@ -99,7 +99,7 @@ typedef uintptr_t limb_t;
 #define GCSTACKSIZE (0x100)
 
 typedef union {
-  ape_Object *o;
+  ape_Cell *o;
   ape_CFunc f;
   floatptr_t n; /* Alternatives before implementing Decimal */
   limb_t d;     /* TODO: Decimal */
@@ -140,20 +140,20 @@ typedef union {
  * +---------------+---------------+
  */
 
-struct ape_Object {
+struct ape_Cell {
   Value car, cdr;
 };
 
 typedef struct {
   int size, top;
-  ape_Object **base;
+  ape_Cell **base;
 } Stack;
 
 typedef struct {
-  limb_t semi_size;       /* semi space size */
-  ape_Object *to, *from;  /* semi space differentiation */
-  ape_Object *head;       /* current head of free memory */
-  Stack stack;            /* GC stack */
+  limb_t semi_size;    /* semi space size */
+  ape_Cell *to, *from; /* semi space differentiation */
+  ape_Cell *head;      /* current head of free memory */
+  Stack stack;         /* GC stack */
 } GC;
 
 struct ape_State {
@@ -166,13 +166,13 @@ struct ape_State {
   unsigned int symid;
   int next_char;
 
-  ape_Object *calllist;
-  ape_Object *symlist;
-  ape_Object *t;
-  ape_Object *env;
+  ape_Cell *calllist;
+  ape_Cell *symlist;
+  ape_Cell *t;
+  ape_Cell *env;
 
-  ape_Object *primsyms[P_MAX];
-  ape_Object *typesyms[APE_TMAX];
+  ape_Cell *primsyms[P_MAX];
+  ape_Cell *typesyms[APE_TMAX];
 };
 
 #define unused(x) ((void)x)
@@ -248,7 +248,7 @@ struct ape_State {
 #define stridx(x) (strbuf(x)[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
-static ape_Object nil = {{(ape_Object *)(APE_TNIL << 3 | 1)}, {NULL}};
+static ape_Cell nil = {{(ape_Cell *)(APE_TNIL << 3 | 1)}, {NULL}};
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
   unused(ud);
@@ -275,7 +275,7 @@ static void *ape_calloc(ape_State *A, size_t n, size_t s) {
 }
 
 static int stack_create(ape_State *A, Stack *stack, int size) {
-  stack->base = (ape_Object **)ape_malloc(A, size * sizeof(ape_Object *));
+  stack->base = (ape_Cell **)ape_malloc(A, size * sizeof(ape_Cell *));
 
   if (!stack->base)
     return -1;
@@ -301,8 +301,8 @@ static int stack_gettop(Stack *stack) { return stack->top; }
 static void stack_settop(Stack *stack, int top) { stack->top = top; }
 
 static Stack *stack_extendifneed(ape_State *A, Stack *stack) {
-  ape_Object **base;
-  int stack_size;
+  ape_Cell **base;
+  int size;
 
   if (stack->top < stack->size)
     return stack;
@@ -310,20 +310,19 @@ static Stack *stack_extendifneed(ape_State *A, Stack *stack) {
   if (stack->size > (INT_MAX >> 1))
     return NULL;
 
-  stack_size = stack->size << 1;
-  base = (ape_Object **)ape_realloc(A, stack->base,
-                                    stack_size * sizeof(ape_Object *));
+  size = stack->size << 1;
+  base = (ape_Cell **)ape_realloc(A, stack->base, size * sizeof(ape_Cell *));
 
   if (!base)
     return NULL;
 
   stack->base = base;
-  stack->size = stack_size;
+  stack->size = size;
 
   return stack;
 }
 
-static ape_Object *stack_push(ape_State *A, Stack *stack, ape_Object *obj) {
+static ape_Object stack_push(ape_State *A, Stack *stack, ape_Cell *cell) {
   stack = stack_extendifneed(A, stack);
 
   if (!stack) {
@@ -331,11 +330,11 @@ static ape_Object *stack_push(ape_State *A, Stack *stack, ape_Object *obj) {
     return NULL;
   }
 
-  stack->base[stack->top++] = obj;
-  return obj;
+  stack->base[stack->top] = cell;
+  return stack->base[stack->top++];
 }
 
-static ape_Object *stack_pop(ape_State *A, Stack *stack) {
+static ape_Cell *stack_pop(ape_State *A, Stack *stack) {
   if (stack->top == 0) {
     ape_error(A, "stack underflow");
     return NULL;
@@ -348,12 +347,12 @@ static int gc_create(ape_State *A, int stack_size) {
 
   /* semi space */
   gc->semi_size = SEMISIZE;
-  gc->to = (ape_Object *)ape_calloc(A, gc->semi_size, sizeof(ape_Object));
+  gc->to = (ape_Cell *)ape_calloc(A, gc->semi_size, sizeof(ape_Cell));
 
   if (!gc->to)
     return -1;
 
-  gc->from = (ape_Object *)ape_calloc(A, gc->semi_size, sizeof(ape_Object));
+  gc->from = (ape_Cell *)ape_calloc(A, gc->semi_size, sizeof(ape_Cell));
 
   if (!gc->from)
     return -1;
@@ -382,47 +381,57 @@ static void gc_destroy(ape_State *A) {
   gc->semi_size = 0;
 }
 
-static ape_Object *handle_gc(ape_State *A, ape_Object *obj) {
-  /* GC the previous C pointer */
-  if (type(obj) == APE_TPTR && A->handlers.gc)
-    A->handlers.gc(A, cdr(obj), (int)ptrtype(obj));
-  return obj;
+ape_Object gc_push(ape_State *A, ape_Cell *cell) {
+  GC *gc = &A->gc;
+  return stack_push(A, &gc->stack, cell);
 }
 
-static void copy_ref(ape_State *A, ape_Object **p) {
+ape_Cell *gc_pop(ape_State *A) {
   GC *gc = &A->gc;
-  ape_Object *obj = *p;
-  ape_Object *dst;
+  return stack_pop(A, &gc->stack);
+}
 
-  if (!obj)
+static ape_Cell *handle_gc(ape_State *A, ape_Cell *cell) {
+  /* GC the previous C pointer */
+  if (type(cell) == APE_TPTR && A->handlers.gc)
+    A->handlers.gc(A, cdr(cell), (int)ptrtype(cell));
+  return cell;
+}
+
+static void copy_ref(ape_State *A, ape_Cell **p) {
+  GC *gc = &A->gc;
+  ape_Cell *cell = *p;
+  ape_Cell *dst;
+
+  if (!cell)
     return;
 
-  if (isnil(obj))
+  if (isnil(cell))
     return;
 
   /* check if already copied */
-  if (type(obj) == APE_TFORWARD) {
+  if (type(cell) == APE_TFORWARD) {
     /* install forward ref */
-    *p = cdr(obj);
+    *p = cdr(cell);
     return;
   }
 
   dst = handle_gc(A, gc->head++);
 
   /* copy object */
-  car(dst) = car(obj);
-  cdr(dst) = cdr(obj);
+  car(dst) = car(cell);
+  cdr(dst) = cdr(cell);
 
   /* place forward address at old location */
-  settype(obj, APE_TFORWARD);
-  cdr(obj) = dst;
+  settype(cell, APE_TFORWARD);
+  cdr(cell) = dst;
 
   *p = dst;
 }
 
 static void copy_heap(ape_State *A) {
   GC *gc = &A->gc;
-  ape_Object *scan;
+  ape_Cell *scan;
   int i;
 
   /* copy the GC stack */
@@ -468,7 +477,7 @@ static void copy_heap(ape_State *A) {
 
 static double collect_garbage(ape_State *A) {
   GC *gc = &A->gc;
-  ape_Object *swap;
+  ape_Cell *swap;
 
   /* swap semi spaces */
   swap = gc->from;
@@ -484,8 +493,8 @@ static double collect_garbage(ape_State *A) {
   return (double)(gc->head - gc->from) / (double)gc->semi_size;
 }
 
-static void free_heap(ape_State *A, ape_Object *heap, limb_t heap_size) {
-  ape_Object *scan;
+static void free_heap(ape_State *A, ape_Cell *heap, limb_t heap_size) {
+  ape_Cell *scan;
 
   /* Handle objects that need to be GC, such as C pointers */
   for (scan = heap; scan != heap + heap_size; ++scan)
@@ -497,7 +506,7 @@ static void free_heap(ape_State *A, ape_Object *heap, limb_t heap_size) {
 
 static int rescale_heap(ape_State *A, int grow_size) {
   GC *gc = &A->gc;
-  ape_Object *from, *to;
+  ape_Cell *from, *to;
   limb_t allocated, semi_size, heap_size;
 
   allocated = (limb_t)(gc->head - gc->from);
@@ -510,14 +519,14 @@ static int rescale_heap(ape_State *A, int grow_size) {
   from = gc->from;
   to = gc->to;
 
-  gc->to = (ape_Object *)ape_calloc(A, semi_size, sizeof(ape_Object));
+  gc->to = (ape_Cell *)ape_calloc(A, semi_size, sizeof(ape_Cell));
 
   if (!gc->to) {
     gc->to = to;
     return -1;
   }
 
-  gc->from = (ape_Object *)ape_calloc(A, semi_size, sizeof(ape_Object));
+  gc->from = (ape_Cell *)ape_calloc(A, semi_size, sizeof(ape_Cell));
 
   if (!gc->from) {
     ape_free(A, gc->to);
@@ -537,9 +546,9 @@ static int rescale_heap(ape_State *A, int grow_size) {
   return 0;
 }
 
-static ape_Object *halloc(ape_State *A, int n) {
+static ape_Cell *halloc(ape_State *A, int n) {
   GC *gc = &A->gc;
-  ape_Object *objs;
+  ape_Cell *cells;
 
   if (gc->head + n > gc->from + gc->semi_size) {
     double usage = collect_garbage(A);
@@ -553,25 +562,23 @@ static ape_Object *halloc(ape_State *A, int n) {
         }
   }
 
-  objs = gc->head;
+  cells = gc->head;
   gc->head += n;
 
   while (n-- > 0) {
-    ape_Object *obj = objs + n;
+    ape_Cell *cell = cells + n;
 
-    if (type(obj) != APE_TFORWARD)
-      handle_gc(A, obj);
+    if (type(cell) != APE_TFORWARD)
+      handle_gc(A, cell);
 
-    memset(obj, 0, sizeof(ape_Object));
+    memset(cell, 0, sizeof(ape_Cell));
   }
 
-  return objs;
+  return cells;
 }
 
-static ape_Object *create_object(ape_State *A) {
-  ape_Object *obj = halloc(A, 1);
-  ape_pushgc(A, obj);
-  return obj;
+static ape_Object create_object(ape_State *A) {
+  return gc_push(A, halloc(A, 1));
 }
 
 /*                            Environment
@@ -588,7 +595,7 @@ static ape_Object *create_object(ape_State *A) {
  * +--------+--------+     +--------+--------+
  */
 
-static ape_Object *create_env(ape_State *A, ape_Object *parent) {
+static ape_Object create_env(ape_State *A, ape_Object parent) {
   return ape_cons(A, &nil, parent);
 }
 
@@ -596,7 +603,7 @@ extern void stdlib_open(ape_State *A);
 
 static ape_State *ape_init(ape_State *A) {
   int i, gctop = ape_savegc(A);
-  
+
   /* init lists */
   A->calllist = &nil;
   A->symlist = &nil;
@@ -622,7 +629,7 @@ static ape_State *ape_init(ape_State *A) {
 
   /* register built in primitives */
   for (i = 0; i < P_MAX; ++i) {
-    ape_Object *v = create_object(A);
+    ape_Object v = create_object(A);
 
     settype(v, APE_TPRIM);
     prim(v) = i;
@@ -665,7 +672,7 @@ void ape_close(ape_State *A) {
 ape_Handlers *ape_handlers(ape_State *A) { return &A->handlers; }
 
 static void raise_error(ape_State *A, const char *errmsg) {
-  ape_Object *cl = A->calllist;
+  ape_Cell *cl = A->calllist;
 
   /* reset context state */
   A->calllist = &nil;
@@ -699,15 +706,7 @@ int ape_error(ape_State *A, const char *format, ...) {
   return -1;
 }
 
-void ape_pushgc(ape_State *A, ape_Object *obj) {
-  GC *gc = &A->gc;
-  stack_push(A, &gc->stack, obj);
-}
-
-void ape_popgc(ape_State *A) {
-  GC *gc = &A->gc;
-  stack_pop(A, &gc->stack);
-}
+void ape_pushgc(ape_State *A, ape_Object obj) { gc_push(A, obj); }
 
 void ape_restoregc(ape_State *A, int idx) {
   GC *gc = &A->gc;
@@ -719,7 +718,7 @@ int ape_savegc(ape_State *A) {
   return stack_gettop(&gc->stack);
 }
 
-int ape_length(ape_State *A, ape_Object *obj) {
+int ape_length(ape_State *A, ape_Object obj) {
   int len;
 
   if (type(obj) == APE_TPAIR) {
@@ -740,17 +739,17 @@ int ape_length(ape_State *A, ape_Object *obj) {
   return ape_error(A, "not an iteratable object");
 }
 
-int ape_isnil(ape_State *A, ape_Object *obj) {
+int ape_isnil(ape_State *A, ape_Object obj) {
   unused(A);
   return isnil(obj);
 }
 
-int ape_type(ape_State *A, ape_Object *obj) {
+int ape_type(ape_State *A, ape_Object obj) {
   unused(A);
   return type(obj);
 }
 
-int ape_equal(ape_State *A, ape_Object *a, ape_Object *b) {
+int ape_equal(ape_State *A, ape_Object a, ape_Object b) {
   unused(A);
 
   if (a == b)
@@ -773,7 +772,7 @@ int ape_equal(ape_State *A, ape_Object *a, ape_Object *b) {
   return 0;
 }
 
-ape_Object *ape_checktype(ape_State *A, ape_Object *obj, int type) {
+ape_Object ape_checktype(ape_State *A, ape_Object obj, int type) {
   if (type(obj) != type) {
     ape_error(A, "expected %s, got %s", typenames[type], typenames[type(obj)]);
     return NULL;
@@ -781,37 +780,37 @@ ape_Object *ape_checktype(ape_State *A, ape_Object *obj, int type) {
   return obj;
 }
 
-ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr) {
-  ape_Object *obj = create_object(A);
+ape_Object ape_cons(ape_State *A, ape_Object car, ape_Object cdr) {
+  ape_Object obj = create_object(A);
   car(obj) = car;
   cdr(obj) = cdr;
   return obj;
 }
 
-ape_Object *ape_car(ape_State *A, ape_Object *obj) {
+ape_Object ape_car(ape_State *A, ape_Object obj) {
   if (isnil(obj))
     return obj;
   return car(ape_checktype(A, obj, APE_TPAIR));
 }
 
-ape_Object *ape_cdr(ape_State *A, ape_Object *obj) {
+ape_Object ape_cdr(ape_State *A, ape_Object obj) {
   if (isnil(obj))
     return obj;
   return cdr(ape_checktype(A, obj, APE_TPAIR));
 }
 
-ape_Object *ape_setcar(ape_State *A, ape_Object *obj, ape_Object *car) {
+ape_Object ape_setcar(ape_State *A, ape_Object obj, ape_Object car) {
   car(ape_checktype(A, obj, APE_TPAIR)) = car;
   return obj;
 }
 
-ape_Object *ape_setcdr(ape_State *A, ape_Object *obj, ape_Object *cdr) {
+ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr) {
   cdr(ape_checktype(A, obj, APE_TPAIR)) = cdr;
   return obj;
 }
 
-ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt) {
-  ape_Object *list = &nil;
+ape_Object ape_list(ape_State *A, ape_Object *objs, int cnt) {
+  ape_Object list = &nil;
 
   while (cnt--)
     list = ape_cons(A, objs[cnt], list);
@@ -819,40 +818,40 @@ ape_Object *ape_list(ape_State *A, ape_Object **objs, int cnt) {
   return list;
 }
 
-ape_Object *ape_true(ape_State *A) { return A->t; }
+ape_Object ape_true(ape_State *A) { return A->t; }
 
-ape_Object *ape_nil(ape_State *A) {
+ape_Object ape_nil(ape_State *A) {
   unused(A);
   return &nil;
 }
 
-ape_Object *ape_bool(ape_State *A, int b) {
+ape_Object ape_bool(ape_State *A, int b) {
   return b ? ape_true(A) : ape_nil(A);
 }
 
-ape_Object *ape_integer(ape_State *A, long long n) {
+ape_Object ape_integer(ape_State *A, long long n) {
   return ape_number(A, (floatptr_t)n);
 }
 
-ape_Object *ape_number(ape_State *A, double n) {
-  ape_Object *obj = create_object(A);
+ape_Object ape_number(ape_State *A, double n) {
+  ape_Object obj = create_object(A);
   settype(obj, APE_TNUMBER);
   number(obj) = (floatptr_t)n;
   return obj;
 }
 
-static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
+static ape_Object build_string(ape_State *A, ape_Object tail, int ch) {
   int index;
 
   if (!tail || (tag(tail) & FCMARKBIT)) {
-    ape_Object *obj = ape_cons(A, NULL, &nil);
+    ape_Object obj = ape_cons(A, NULL, &nil);
     settype(obj, APE_TSTRING);
 
     if (!tail)
       return obj;
 
     cdr(tail) = obj;
-    ape_popgc(A);
+    gc_pop(A);
 
     tail = obj;
   }
@@ -868,7 +867,7 @@ static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
   return tail;
 }
 
-static int string_ref(ape_State *A, ape_Object *str, int idx) {
+static int string_ref(ape_State *A, ape_Object str, int idx) {
   int cnt = 0;
 
   while (idx >= 0) {
@@ -894,13 +893,13 @@ static int string_ref(ape_State *A, ape_Object *str, int idx) {
   return strbuf(str)[idx];
 }
 
-ape_Object *ape_string(ape_State *A, const char *str) {
+ape_Object ape_string(ape_State *A, const char *str) {
   return ape_lstring(A, str, (int)strlen(str));
 }
 
-ape_Object *ape_lstring(ape_State *A, const char *str, int len) {
-  ape_Object *obj = build_string(A, NULL, 0);
-  ape_Object *tail = obj;
+ape_Object ape_lstring(ape_State *A, const char *str, int len) {
+  ape_Object obj = build_string(A, NULL, 0);
+  ape_Object tail = obj;
   int i;
 
   for (i = 0; i < len; ++i)
@@ -909,10 +908,10 @@ ape_Object *ape_lstring(ape_State *A, const char *str, int len) {
   return obj;
 }
 
-ape_Object *ape_concat(ape_State *A, ape_Object *objs) {
-  ape_Object *obj = build_string(A, NULL, 0);
-  ape_Object *tail = obj;
-  ape_Object *str;
+ape_Object ape_concat(ape_State *A, ape_Object objs) {
+  ape_Object obj = build_string(A, NULL, 0);
+  ape_Object tail = obj;
+  ape_Object str;
   int i, size;
 
   while (!isnil(objs)) {
@@ -930,7 +929,7 @@ ape_Object *ape_concat(ape_State *A, ape_Object *objs) {
   return obj;
 }
 
-static int strleq(ape_Object *obj, const char *str, int len) {
+static int strleq(ape_Object obj, const char *str, int len) {
   int i, j = 0;
 
   while (!isnil(obj) && j < len) {
@@ -948,13 +947,13 @@ static int strleq(ape_Object *obj, const char *str, int len) {
   return isnil(obj) && j == len;
 }
 
-static int streq(ape_Object *obj, const char *str) {
+static int streq(ape_Object obj, const char *str) {
   return strleq(obj, str, (int)strlen(str));
 }
 
-static ape_Object *symbol(ape_State *A, limb_t h, const char *name, int len,
-                          int pushlist) {
-  ape_Object *obj = create_object(A);
+static ape_Object symbol(ape_State *A, limb_t h, const char *name, int len,
+                         int pushlist) {
+  ape_Object obj = create_object(A);
 
   settype(obj, APE_TSYMBOL);
   hash(obj) = h;
@@ -976,8 +975,8 @@ static limb_t fast_hash(const char *str, int len) {
   return h & HASHMASK;
 }
 
-ape_Object *ape_symbol(ape_State *A, const char *name) {
-  ape_Object *obj;
+ape_Object ape_symbol(ape_State *A, const char *name) {
+  ape_Object obj;
   int len = (int)strlen(name);
   limb_t h = fast_hash(name, len);
 
@@ -998,8 +997,8 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
  * +---------------------+-------------------------------------------+
  */
 
-ape_Object *ape_vector(ape_State *A, int len) {
-  ape_Object *obj;
+ape_Object ape_vector(ape_State *A, int len) {
+  ape_Object obj;
 
   if (len < 1) {
     ape_error(A, "vector length must greater than zero");
@@ -1014,14 +1013,13 @@ ape_Object *ape_vector(ape_State *A, int len) {
   return obj;
 }
 
-static ape_Object **vector_place(ape_Object *vec, int index) {
+static ape_Object *vector_place(ape_Object vec, int index) {
   return (index & 1) == 0 ? &car(&vec[index >> 1]) : &cdr(&vec[index >> 1]);
 }
 
-ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
-                       ape_Object *obj) {
+ape_Object ape_vecset(ape_State *A, ape_Object vec, int pos, ape_Object obj) {
   int len = (int)veclen(ape_checktype(A, vec, APE_TVECTOR));
-  ape_Object **place;
+  ape_Object *place;
 
   if (pos >= len) {
     ape_error(A, "vector out of range");
@@ -1039,22 +1037,22 @@ ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
   return vec;
 }
 
-ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
-  ape_Object *obj = create_object(A);
+ape_Object ape_cfunc(ape_State *A, ape_CFunc fn) {
+  ape_Object obj = create_object(A);
   settype(obj, APE_TCFUNC);
   cfunc(obj) = fn;
   return obj;
 }
 
-ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype) {
-  ape_Object *obj = create_object(A);
+ape_Object ape_ptr(ape_State *A, void *ptr, int subtype) {
+  ape_Object obj = create_object(A);
   settype(obj, APE_TPTR);
-  cdr(obj) = (ape_Object *)ptr;
+  cdr(obj) = (ape_Object)ptr;
   ptrtype(obj) = subtype & 0xFFFF;
   return obj;
 }
 
-ape_Object *ape_gensym(ape_State *A) {
+ape_Object ape_gensym(ape_State *A) {
   char gensym[16] = {0};
   int len = sprintf(gensym, "#:%u", A->symid++);
 
@@ -1062,9 +1060,9 @@ ape_Object *ape_gensym(ape_State *A) {
   return symbol(A, fast_hash(gensym, len), gensym, len, 0);
 }
 
-ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
-  ape_Object *res = &nil;
-  ape_Object *tail;
+ape_Object ape_reverse(ape_State *A, ape_Object obj) {
+  ape_Object res = &nil;
+  ape_Object tail;
   int i, len;
 
   switch (type(obj)) {
@@ -1097,7 +1095,7 @@ ape_Object *ape_reverse(ape_State *A, ape_Object *obj) {
   return res;
 }
 
-ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
+ape_Object ape_nth(ape_State *A, ape_Object obj, int idx) {
   switch (type(obj)) {
   case APE_TPAIR:
     while (idx-- > 0) {
@@ -1117,7 +1115,7 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
 
   case APE_TVECTOR: {
     int cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
-    ape_Object **place;
+    ape_Object *place;
 
     if (idx >= cnt) {
       ape_error(A, "index out of range");
@@ -1135,12 +1133,12 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
   return &nil;
 }
 
-ape_Object *ape_append(ape_State *A, ape_Object *objs) {
-  ape_Object *res = &nil;
-  ape_Object **tail = &res;
+ape_Object ape_append(ape_State *A, ape_Object objs) {
+  ape_Object res = &nil;
+  ape_Object *tail = &res;
 
   while (!isnil(objs)) {
-    ape_Object *obj = ape_nextarg(A, &objs);
+    ape_Object obj = ape_nextarg(A, &objs);
 
     if (type(obj) != APE_TPAIR && isnil(objs)) {
       *tail = obj;
@@ -1155,11 +1153,11 @@ ape_Object *ape_append(ape_State *A, ape_Object *objs) {
   return res;
 }
 
-long long ape_tointeger(ape_State *A, ape_Object *obj) {
+long long ape_tointeger(ape_State *A, ape_Object obj) {
   return (long long)number(ape_checktype(A, obj, APE_TNUMBER));
 }
 
-double ape_tonumber(ape_State *A, ape_Object *obj) {
+double ape_tonumber(ape_State *A, ape_Object obj) {
   return number(ape_checktype(A, obj, APE_TNUMBER));
 }
 
@@ -1179,7 +1177,7 @@ static void writebuf(ape_State *A, void *udata, char ch) {
   }
 }
 
-int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size) {
+int ape_tostring(ape_State *A, ape_Object obj, char *dst, int size) {
   CharPtrInt x;
 
   x.p = dst;
@@ -1191,19 +1189,19 @@ int ape_tostring(ape_State *A, ape_Object *obj, char *dst, int size) {
   return size - x.n - 1;
 }
 
-int ape_ptrtype(ape_State *A, ape_Object *obj) {
+int ape_ptrtype(ape_State *A, ape_Object obj) {
   return (int)ptrtype(ape_checktype(A, obj, APE_TPTR));
 }
 
-void *ape_toptr(ape_State *A, ape_Object *obj) {
+void *ape_toptr(ape_State *A, ape_Object obj) {
   return cdr(ape_checktype(A, obj, APE_TPTR));
 }
 
-static ape_Object rparen = {0};
+static ape_Cell rparen = {0};
 
-static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
+static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
-  ape_Object *v, *res, **tail;
+  ape_Object v, res, *tail;
   floatptr_t n;
   int ch, top;
   char buf[APE_SYMSIZE] = {0}, *p;
@@ -1366,8 +1364,8 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   return NULL;
 }
 
-ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {
-  ape_Object *obj = reader(A, fn, udata);
+ape_Object ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {
+  ape_Object obj = reader(A, fn, udata);
 
   if (obj == &rparen) {
     ape_error(A, "stray ')'");
@@ -1382,7 +1380,7 @@ static void writestr(ape_State *A, ape_WriteFunc fn, void *udata,
     fn(A, udata, *str++);
 }
 
-void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
+void ape_write(ape_State *A, ape_Object obj, ape_WriteFunc fn, void *udata,
                int strqt) {
   char buf[APE_SYMSIZE];
   int i, len;
@@ -1491,8 +1489,8 @@ void ape_write(ape_State *A, ape_Object *obj, ape_WriteFunc fn, void *udata,
 #define ENV_RECUR 0x1
 #define ENV_CREATE 0x2
 
-static ape_Object **getbound(ape_Object *sym, ape_Object *env, int flags) {
-  ape_Object *bound, **frame = NULL;
+static ape_Object *getbound(ape_Object sym, ape_Object env, int flags) {
+  ape_Object bound, *frame = NULL;
 
   /* Try to find in environment */
   for (; !isnil(env); env = cdr(env)) {
@@ -1511,9 +1509,9 @@ static ape_Object **getbound(ape_Object *sym, ape_Object *env, int flags) {
   return frame;
 }
 
-ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
-                        int recur) {
-  ape_Object **frame, *bound;
+ape_Object ape_unbound(ape_State *A, ape_Object sym, ape_Object env,
+                       int recur) {
+  ape_Object *frame, bound;
 
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
@@ -1528,9 +1526,9 @@ ape_Object *ape_unbound(ape_State *A, ape_Object *sym, ape_Object *env,
   return &nil;
 }
 
-ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
-                    ape_Object *env) {
-  ape_Object **frame, *bound;
+ape_Object ape_def(ape_State *A, ape_Object sym, ape_Object val,
+                   ape_Object env) {
+  ape_Object *frame, bound;
 
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
@@ -1547,9 +1545,9 @@ ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
   return val;
 }
 
-ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
-                    ape_Object *env) {
-  ape_Object **frame, *bound;
+ape_Object ape_set(ape_State *A, ape_Object sym, ape_Object val,
+                   ape_Object env) {
+  ape_Object *frame, bound;
 
   env = env ? env : A->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
@@ -1566,8 +1564,8 @@ ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
   return val;
 }
 
-ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
-  ape_Object *arg = *args;
+ape_Object ape_nextarg(ape_State *A, ape_Object *args) {
+  ape_Object arg = *args;
 
   if (type(arg) != APE_TPAIR) {
     if (isnil(arg)) {
@@ -1585,10 +1583,10 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
 
 #define evalarg() ape_eval(A, ape_nextarg(A, &args), env)
 
-static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env,
-                             int *argc) {
-  ape_Object *res = &nil;
-  ape_Object **tail = &res;
+static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
+                            int *argc) {
+  ape_Object res = &nil;
+  ape_Object *tail = &res;
   int cnt = 0;
 
   while (!isnil(list)) {
@@ -1603,7 +1601,7 @@ static ape_Object *eval_list(ape_State *A, ape_Object *list, ape_Object *env,
   return res;
 }
 
-static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object arith_add(ape_State *A, ape_Object args, ape_Object env) {
   floatptr_t res = 0;
 
   while (!isnil(args))
@@ -1612,9 +1610,9 @@ static ape_Object *arith_add(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, res);
 }
 
-static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object arith_sub(ape_State *A, ape_Object args, ape_Object env) {
   floatptr_t res;
-  ape_Object *x;
+  ape_Object x;
 
   if (isnil(args)) {
     ape_error(A, "wrong number of operands");
@@ -1634,7 +1632,7 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, res);
 }
 
-static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object arith_mul(ape_State *A, ape_Object args, ape_Object env) {
   floatptr_t res = 1;
 
   while (!isnil(args))
@@ -1643,9 +1641,9 @@ static ape_Object *arith_mul(ape_State *A, ape_Object *args, ape_Object *env) {
   return ape_number(A, res);
 }
 
-static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
+static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
   floatptr_t res;
-  ape_Object *x;
+  ape_Object x;
 
   if (isnil(args)) {
     ape_error(A, "wrong number of operands");
@@ -1701,9 +1699,9 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
     }                                                                          \
   } while (0)
 
-static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
-                       ape_Object *env) {
-  ape_Object *bind;
+static void args_binds(ape_State *A, ape_Object syms, ape_Object args,
+                       ape_Object env) {
+  ape_Object bind;
 
   while (!isnil(syms)) {
     /* rest arguments */
@@ -1715,7 +1713,7 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
     bind = car(syms);
 
     if (isnil(args)) {
-      ape_Object *arg;
+      ape_Object arg;
 
       if (type(bind) != APE_TPAIR) {
         ape_error(A, "wrong number of arguments");
@@ -1738,22 +1736,22 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
   }
 }
 
-static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
-  ape_Object *res = &nil;
-  ape_Object **tail = &res;
+static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
+  ape_Object res = &nil;
+  ape_Object *tail = &res;
 
   if (type(expr) != APE_TPAIR)
     return expr;
 
   while (!isnil(expr)) {
-    ape_Object *obj = ape_nextarg(A, &expr);
+    ape_Object obj = ape_nextarg(A, &expr);
 
     if (type(obj) == APE_TPAIR) {
-      ape_Object *fn = car(obj);
-      ape_Object *args = cdr(obj);
+      ape_Object fn = car(obj);
+      ape_Object args = cdr(obj);
 
       if (fn == A->primsyms[P_UNQUOTE_SPLICING]) {
-        ape_Object *arg = ape_nextarg(A, &args);
+        ape_Object arg = ape_nextarg(A, &args);
 
         arg = quasiquote(A, ape_cons(A, arg, &nil), env);
         arg = car(ape_checktype(A, arg, APE_TPAIR));
@@ -1775,7 +1773,7 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
 
         continue;
       } else if (fn == A->primsyms[P_UNQUOTE]) {
-        ape_Object *arg = ape_nextarg(A, &args);
+        ape_Object arg = ape_nextarg(A, &args);
 
         if (type(arg) == APE_TPAIR) {
           arg = quasiquote(A, ape_cons(A, arg, &nil), env);
@@ -1807,8 +1805,8 @@ static ape_Object *quasiquote(ape_State *A, ape_Object *expr, ape_Object *env) {
  *              +-----+------+
  */
 
-static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
-  ape_Object *body, *head, *env;
+static ape_Object expand(ape_State *A, ape_Object macro, ape_Object args) {
+  ape_Object body, head, env;
 
   /* ((env . args) . (do ...)) */
   body = cdr(ape_checktype(A, macro, APE_TMACRO));
@@ -1823,17 +1821,17 @@ static ape_Object *expand(ape_State *A, ape_Object *macro, ape_Object *args) {
   return ape_eval(A, cdr(body), env);
 }
 
-ape_Object *ape_eval(ape_State *A, ape_Object *expr, ape_Object *env) {
-  ape_Object *fn, *args;
-  ape_Object cl;
-  ape_Object *res, *va, *vb; /* registers */
+ape_Object ape_eval(ape_State *A, ape_Object expr, ape_Object env) {
+  ape_Object fn, args;
+  ape_Cell cl;
+  ape_Object res, va, vb; /* registers */
   int gctop, argc, i;
 
   env = env ? env : A->env;
 
 EVAL:
   if (type(expr) == APE_TSYMBOL) {
-    ape_Object **frame, *bound;
+    ape_Object *frame, bound;
 
     frame = getbound(expr, env, ENV_RECUR);
 
@@ -2051,8 +2049,8 @@ EVAL:
   return res;
 }
 
-ape_Object *ape_load(ape_State *A, const char *file, ape_Object *env) {
-  ape_Object *expr;
+ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
+  ape_Object expr;
   FILE *fp;
   int gctop;
 
@@ -2093,7 +2091,7 @@ static char readbuffer(ape_State *A, void *udata) {
   return ch;
 }
 
-ape_Object *ape_readstring(ape_State *A, const char *str) {
+ape_Object ape_readstring(ape_State *A, const char *str) {
   CharPtrInt x;
 
   x.p = (char *)str;
@@ -2108,7 +2106,7 @@ static char readfp(ape_State *A, void *udata) {
   return ch == EOF ? '\0' : ch;
 }
 
-ape_Object *ape_readfp(ape_State *A, FILE *fp) {
+ape_Object ape_readfp(ape_State *A, FILE *fp) {
   return ape_read(A, readfp, fp);
 }
 
@@ -2117,6 +2115,6 @@ static void writefp(ape_State *A, void *udata, char ch) {
   fputc(ch, (FILE *)udata);
 }
 
-void ape_writefp(ape_State *A, ape_Object *obj, FILE *fp) {
+void ape_writefp(ape_State *A, ape_Object obj, FILE *fp) {
   ape_write(A, obj, writefp, fp, 0);
 }
