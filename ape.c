@@ -105,9 +105,9 @@ typedef union {
   uword_t d;   /* TODO: Decimal */
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    limb_t coefficient : NUMBUFSIZE * 8;
-    slimb_t exponent : EXPNBUFSIZE * 8;
-    limb_t _ : 8;
+    uword_t coefficient : NUMBUFSIZE * 8;
+    sword_t exponent : EXPNBUFSIZE * 8;
+    uword_t _ : 8;
 #else
     uword_t _ : 8;
     sword_t exponent : EXPNBUFSIZE * 8;
@@ -125,8 +125,8 @@ typedef union {
   };
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    limb_t nx : STRBUFSIZE * 8;
-    limb_t __ : 8;
+    uword_t nx : STRBUFSIZE * 8;
+    uword_t __ : 8;
 #else
     uword_t __ : 8;
     uword_t nx : STRBUFSIZE * 8;
