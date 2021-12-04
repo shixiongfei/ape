@@ -75,7 +75,7 @@ static const char *primnames[] = {
 };
 
 static const char *typenames[] = {
-    "pair",   "free",     "nil",   "number",    "symbol",    "string",
+    "pair",   "forward",  "nil",   "number",    "symbol",    "string",
     "vector", "function", "macro", "primitive", "cfunction", "pointer",
 };
 
@@ -84,19 +84,19 @@ typedef uintptr_t limb_t;
 
 #define STRBUFSIZE ((int)sizeof(ape_Object *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
+
 #if INTPTR_MAX >= INT64_MAX
 #define EXPNBUFSIZE 2
 #else
 #define EXPNBUFSIZE 1
 #endif
 #define NUMBUFSIZE ((int)sizeof(ape_Object *) - EXPNBUFSIZE - 1)
-#define CHUNKSIZE (0xFFFF)
-#define GCSTACKSIZE (256)
-#define GCMARKBIT (0x2)
-#define FCMARKBIT (0x4)
-#define SNMARKBIT (0x4)
+
+#define FCMARKBIT (1 << 2) /* Full Chars */
 #define HASHMASK ((1 << 16) - 1)
-#define MAXVECSIZE (1 << 24)
+#define PTRTYPEMASK 0xFFFF
+#define SEMISIZE (0x8000)
+#define GCSTACKSIZE (0x100)
 
 typedef union {
   ape_Object *o;
@@ -144,57 +144,29 @@ struct ape_Object {
   Value car, cdr;
 };
 
-/*                               Chunks
- * +--------+--------+--------+           +--------+--------+--------+
- * | Object | Object | Object |     +-----+ Object | Object | Object |
- * +--------+--------+--------+     |     +--------+--------+--------+
- * | Object | Object | Object |     |     | Object | Object | Object |
- * +--------+--------+--------+     |     +--------+--------+--------+
- * |        ...etc...         |     |     |        ...etc...         |
- * +--------------------------+     |     +--------------------------+
- * |        next chunk        +-----+     |    next chunk or NULL    |
- * +--------------------------+           +--------------------------+
- */
+typedef struct {
+  int size, top;
+  ape_Object **base;
+} Stack;
 
-typedef struct ape_Chunk {
-  ape_Object objects[CHUNKSIZE];
-  union {
-    ape_Object _; /* memory alignment */
-    struct ape_Chunk *next;
-  };
-} ape_Chunk;
-
-/*                        Symbol List
- *      +--------+--------+        +--------+--------+
- *      |  car   |   cdr  +--------+  car   |   nil  |
- *      +---+----+--------+        +---+----+--------+
- *          |                          |
- * +--------+--------+        +--------+--------+
- * | Symbol |        |        | Symbol |        |
- * +--------+---+----+        +--------+---+----+
- *              |                          |
- *     +--------+--------+        +--------+--------+
- *     | String |  ...   |        | String |  ...   |
- *     +--------+--------+        +--------+--------+
- */
+typedef struct {
+  limb_t semi_size;       /* semi space size */
+  ape_Object *to, *from;  /* semi space differentiation */
+  ape_Object *head;       /* current head of free memory */
+  Stack stack;            /* GC stack */
+} GC;
 
 struct ape_State {
   ape_Alloc alloc;
   void *ud;
 
+  GC gc;
   ape_Handlers handlers;
 
   unsigned int symid;
   int next_char;
 
-  ape_Chunk *chunks;
-  int chunks_count;
-
-  int gcstack_idx;
-  ape_Object *gcstack[GCSTACKSIZE];
-
   ape_Object *calllist;
-  ape_Object *freelist;
   ape_Object *symlist;
   ape_Object *t;
   ape_Object *env;
@@ -210,14 +182,14 @@ struct ape_State {
 
 /*                Tag
  * +---+---+---+---+---+---+---+---+
- * |      Type     | ? |FC |GC | 1 |
+ * |        Type       |FC | ? | 1 |
  * +---+---+---+---+---+---+---+---+
  * 8   7   6   5   4   3   2   1   0
  */
 
 #define tag(x) ((x)->car.c)
-#define type(x) (tag(x) & 0x1 ? tag(x) >> 4 : APE_TPAIR)
-#define settype(x, t) (tag(x) = (t) << 4 | 1)
+#define type(x) (tag(x) & 0x1 ? tag(x) >> 3 : APE_TPAIR)
+#define settype(x, t) (tag(x) = (t) << 3 | 1)
 
 #define isnil(x) ((x) == &nil)
 #define hash(x) ((x)->car.nx)
@@ -229,18 +201,18 @@ struct ape_State {
  *                                64Bit Platform
  * +-------------------------------------------------------+-------------------+
  * |             tag                16bit        40bit     |       64bit       |
- * | +--------+---+---+---+---+ +----------+---------------+-----------------+ |
- * | | Number | ? |0/1| 0 | 1 | | exponent |  coefficient            d       | |
- * | +--------+---+---+---+---+ +----------+---------------+-----------------+ |
+ * | +------------+---+---+---+ +----------+---------------+-----------------+ |
+ * | |   Number   |0/1| ? | 1 | | exponent |  coefficient            d       | |
+ * | +------------+---+---+---+ +----------+---------------+-----------------+ |
  * |              sign                                     |                   |
  * +-------------------------------------------------------+-------------------+
  *
  *                                32Bit Platform
  * +-------------------------------------------------------+-------------------+
  * |             tag                8bit         16bit     |       32bit       |
- * | +--------+---+---+---+---+ +----------+---------------+-----------------+ |
- * | | Number | ? |0/1| 0 | 1 | | exponent |  coefficient            d       | |
- * | +--------+---+---+---+---+ +----------+---------------+-----------------+ |
+ * | +------------+---+---+---+ +----------+---------------+-----------------+ |
+ * | |   Number   |0/1| ? | 1 | | exponent |  coefficient            d       | |
+ * | +------------+---+---+---+ +----------+---------------+-----------------+ |
  * |              sign                                     |                   |
  * +-------------------------------------------------------+-------------------+
  */
@@ -253,9 +225,9 @@ struct ape_State {
  *                             car                                       cdr
  * +-----------------------------------------------------------------+---------+
  * |             tag                         strbuf                  |         |
- * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |         |
- * | | String | ? | 1 | 0 | 1 | | \H | \e | \l | \l | \o | \, | \  | |    +    |
- * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |    |    |
+ * | +------------+---+---+---+ +----+----+----+----+----+----+----+ |         |
+ * | |   String   | 1 | ? | 1 | | \H | \e | \l | \l | \o | \, | \  | |    +    |
+ * | +------------+---+---+---+ +----+----+----+----+----+----+----+ |    |    |
  * |              c               s0   s1   s2   s3   s4   s5   s6   |    |    |
  * +-----------------------------------------------------------------+----+----+
  *                                                                        |
@@ -263,9 +235,9 @@ struct ape_State {
  *                              |
  * +----------------------------+------------------------------------+---------+
  * |             tag                         strbuf                  |         |
- * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |         |
- * | | String | ? | 0 | 0 | 1 | | \W | \o | \r | \l | \d | \. |  6 | |   nil   |
- * | +--------+---+---+---+---+ +----+----+----+----+----+----+----+ |         |
+ * | +------------+---+---+---+ +----+----+----+----+----+----+----+ |         |
+ * | |   String   | 0 | ? | 1 | | \W | \o | \r | \l | \d | \. |  6 | |   nil   |
+ * | +------------+---+---+---+ +----+----+----+----+----+----+----+ |         |
  * |              c               s0   s1   s2   s3   s4   s5   s6   |         |
  * +-----------------------------------------------------------------+---------+
  *
@@ -276,7 +248,7 @@ struct ape_State {
 #define stridx(x) (strbuf(x)[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
-static ape_Object nil = {{(ape_Object *)(APE_TNIL << 4 | 1)}, {NULL}};
+static ape_Object nil = {{(ape_Object *)(APE_TNIL << 3 | 1)}, {NULL}};
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
   unused(ud);
@@ -292,92 +264,329 @@ static void *alloc_emul(void *ud, void *ptr, size_t size) {
 #define ape_malloc(A, n) ape_realloc(A, NULL, n)
 #define ape_free(A, p) ape_realloc(A, p, 0)
 
-static int extend_chunks(ape_State *A) {
-  ape_Chunk *chunk = (ape_Chunk *)ape_malloc(A, sizeof(ape_Chunk));
-  int i;
+static void *ape_calloc(ape_State *A, size_t n, size_t s) {
+  void *p = ape_malloc(A, n * s);
 
-  if (!chunk)
+  if (!p)
+    return NULL;
+
+  memset(p, 0, n * s);
+  return p;
+}
+
+static int stack_create(ape_State *A, Stack *stack, int size) {
+  stack->base = (ape_Object **)ape_malloc(A, size * sizeof(ape_Object *));
+
+  if (!stack->base)
     return -1;
 
-  memset(chunk, 0, sizeof(ape_Chunk));
+  stack->base;
+  stack->size = size;
+  stack->top = 0;
 
-  /* push to the chunks list */
-  chunk->next = A->chunks;
-  A->chunks = chunk;
-  A->chunks_count += 1;
-
-  /* populate freelist */
-  for (i = 0; i < CHUNKSIZE; ++i) {
-    ape_Object *obj = &chunk->objects[i];
-    settype(obj, APE_TFREE);
-    cdr(obj) = A->freelist;
-    A->freelist = obj;
-  }
   return 0;
 }
 
-static double collect_garbage(ape_State *A) {
-  ape_Chunk *chunk;
-  int i, marked_count = 0;
-
-  if (A->chunks_count == 0)
-    return 1.0;
-
-  /* mark */
-  for (i = 0; i < A->gcstack_idx; i++)
-    ape_mark(A, A->gcstack[i]);
-
-  ape_mark(A, A->symlist);
-  ape_mark(A, A->env);
-
-  /* sweep and unmark */
-  for (chunk = A->chunks; chunk != NULL; chunk = chunk->next) {
-    for (i = 0; i < CHUNKSIZE; ++i) {
-      ape_Object *obj = &chunk->objects[i];
-
-      if (type(obj) == APE_TFREE)
-        continue;
-
-      /* marked */
-      if (tag(obj) & GCMARKBIT) {
-        tag(obj) &= ~GCMARKBIT;
-        marked_count += 1;
-        continue;
-      }
-
-      if (type(obj) == APE_TPTR && A->handlers.gc)
-        A->handlers.gc(A, obj);
-
-      settype(obj, APE_TFREE);
-      cdr(obj) = A->freelist;
-      A->freelist = obj;
-    }
+static void stack_destroy(ape_State *A, Stack *stack) {
+  if (stack->base) {
+    ape_free(A, stack);
+    stack->base = NULL;
   }
-  return (double)marked_count / ((double)A->chunks_count * CHUNKSIZE);
+
+  stack->top = stack->size = 0;
 }
 
-static ape_Object *alloc(ape_State *A) {
-  ape_Object *obj;
+static int stack_gettop(Stack *stack) { return stack->top; }
 
-  /* do gc if freelist has no more objects */
-  if (isnil(A->freelist)) {
-    double usage = collect_garbage(A);
+static void stack_settop(Stack *stack, int top) { stack->top = top; }
 
-    /* Expand the capacity when the usage rate reaches 75% */
-    if (usage > 0.75)
-      if (extend_chunks(A) < 0)
-        if (isnil(A->freelist))
-          ape_error(A, "out of memory");
+static Stack *stack_extendifneed(ape_State *A, Stack *stack) {
+  ape_Object **base;
+  int stack_size;
+
+  if (stack->top < stack->size)
+    return stack;
+
+  if (stack->size > (INT_MAX >> 1))
+    return NULL;
+
+  stack_size = stack->size << 1;
+  base = (ape_Object **)ape_realloc(A, stack->base,
+                                    stack_size * sizeof(ape_Object *));
+
+  if (!base)
+    return NULL;
+
+  stack->base = base;
+  stack->size = stack_size;
+
+  return stack;
+}
+
+static ape_Object *stack_push(ape_State *A, Stack *stack, ape_Object *obj) {
+  stack = stack_extendifneed(A, stack);
+
+  if (!stack) {
+    ape_error(A, "stack overflow");
+    return NULL;
   }
 
-  /* get object from freelist and push to the gcstack */
-  obj = A->freelist;
-  A->freelist = cdr(obj);
-  ape_pushgc(A, obj);
-
-  memset(obj, 0, sizeof(ape_Object));
+  stack->base[stack->top++] = obj;
   return obj;
 }
+
+static ape_Object *stack_pop(ape_State *A, Stack *stack) {
+  if (stack->top == 0) {
+    ape_error(A, "stack underflow");
+    return NULL;
+  }
+  return stack->base[--stack->top];
+}
+
+static int gc_create(ape_State *A, int stack_size) {
+  GC *gc = &A->gc;
+
+  /* semi space */
+  gc->semi_size = SEMISIZE;
+  gc->to = (ape_Object *)ape_calloc(A, gc->semi_size, sizeof(ape_Object));
+
+  if (!gc->to)
+    return -1;
+
+  gc->from = (ape_Object *)ape_calloc(A, gc->semi_size, sizeof(ape_Object));
+
+  if (!gc->from)
+    return -1;
+
+  gc->head = gc->from;
+
+  return stack_create(A, &gc->stack, stack_size);
+}
+
+static void gc_destroy(ape_State *A) {
+  GC *gc = &A->gc;
+
+  stack_destroy(A, &gc->stack);
+
+  if (gc->to) {
+    ape_free(A, gc->to);
+    gc->to = NULL;
+  }
+
+  if (gc->from) {
+    ape_free(A, gc->from);
+    gc->from = NULL;
+  }
+
+  gc->head = NULL;
+  gc->semi_size = 0;
+}
+
+static ape_Object *handle_gc(ape_State *A, ape_Object *obj) {
+  /* GC the previous C pointer */
+  if (type(obj) == APE_TPTR && A->handlers.gc)
+    A->handlers.gc(A, cdr(obj), (int)ptrtype(obj));
+  return obj;
+}
+
+static void copy_ref(ape_State *A, ape_Object **p) {
+  GC *gc = &A->gc;
+  ape_Object *obj = *p;
+  ape_Object *dst;
+
+  if (!obj)
+    return;
+
+  if (isnil(obj))
+    return;
+
+  /* check if already copied */
+  if (type(obj) == APE_TFORWARD) {
+    /* install forward ref */
+    *p = cdr(obj);
+    return;
+  }
+
+  dst = handle_gc(A, gc->head++);
+
+  /* copy object */
+  car(dst) = car(obj);
+  cdr(dst) = cdr(obj);
+
+  /* place forward address at old location */
+  settype(obj, APE_TFORWARD);
+  cdr(obj) = dst;
+
+  *p = dst;
+}
+
+static void copy_heap(ape_State *A) {
+  GC *gc = &A->gc;
+  ape_Object *scan;
+  int i;
+
+  /* copy the GC stack */
+  for (i = 0; i < gc->stack.top; ++i)
+    copy_ref(A, gc->stack.base + i);
+
+  /* copy the symbol list */
+  copy_ref(A, &A->symlist);
+  copy_ref(A, &A->t);
+
+  /* copy the environment */
+  copy_ref(A, &A->env);
+
+  /* copy the primitive symbols */
+  for (i = 0; i < P_MAX; ++i)
+    copy_ref(A, &A->primsyms[i]);
+
+  /* copy the type name symbols */
+  for (i = 0; i < APE_TMAX; ++i)
+    copy_ref(A, &A->typesyms[i]);
+
+  /* scan until reaching the head */
+  for (scan = gc->from; scan != gc->head; ++scan) {
+    switch (type(scan)) {
+    case APE_TPAIR:
+      copy_ref(A, &car(scan));
+      /* fall through */
+    case APE_TFUNC:
+    case APE_TMACRO:
+    case APE_TSYMBOL:
+    case APE_TSTRING:
+      copy_ref(A, &cdr(scan));
+      break;
+    case APE_TVECTOR:
+      copy_ref(A, &cdr(scan));
+
+      for (i = 0; i < (int)((veclen(scan) >> 1) + (veclen(scan) & 1)); ++i)
+        copy_ref(A, &cdr(scan) + i);
+      break;
+    }
+  }
+}
+
+static double collect_garbage(ape_State *A) {
+  GC *gc = &A->gc;
+  ape_Object *swap;
+
+  /* swap semi spaces */
+  swap = gc->from;
+  gc->from = gc->to;
+  gc->to = swap;
+
+  /* set head ptrs */
+  gc->head = gc->from;
+
+  copy_heap(A);
+
+  /* calculate usage */
+  return (double)(gc->head - gc->from) / (double)gc->semi_size;
+}
+
+static void free_heap(ape_State *A, ape_Object *heap, limb_t heap_size) {
+  ape_Object *scan;
+
+  /* Handle objects that need to be GC, such as C pointers */
+  for (scan = heap; scan != heap + heap_size; ++scan)
+    if (type(scan) != APE_TFORWARD)
+      handle_gc(A, scan);
+
+  ape_free(A, heap);
+}
+
+static int rescale_heap(ape_State *A, int grow_size) {
+  GC *gc = &A->gc;
+  ape_Object *from, *to;
+  limb_t allocated, semi_size, heap_size;
+
+  allocated = (limb_t)(gc->head - gc->from);
+  semi_size = gc->semi_size << 1;
+  heap_size = gc->semi_size;
+
+  while (semi_size <= (allocated + grow_size))
+    semi_size <<= 1;
+
+  from = gc->from;
+  to = gc->to;
+
+  gc->to = (ape_Object *)ape_calloc(A, semi_size, sizeof(ape_Object));
+
+  if (!gc->to) {
+    gc->to = to;
+    return -1;
+  }
+
+  gc->from = (ape_Object *)ape_calloc(A, semi_size, sizeof(ape_Object));
+
+  if (!gc->from) {
+    ape_free(A, gc->to);
+    gc->to = to;
+    gc->from = from;
+    return -1;
+  }
+
+  gc->from = from;
+  gc->head = gc->from;
+  gc->semi_size = semi_size;
+
+  copy_heap(A);
+  free_heap(A, from, heap_size);
+  free_heap(A, to, heap_size);
+
+  return 0;
+}
+
+static ape_Object *halloc(ape_State *A, int n) {
+  GC *gc = &A->gc;
+  ape_Object *objs;
+
+  if (gc->head + n > gc->from + gc->semi_size) {
+    double usage = collect_garbage(A);
+
+    /* Rescale the semi space when the usage rate reaches 75% */
+    if (usage > 0.75)
+      if (rescale_heap(A, n) < 0)
+        if (gc->head + n > gc->from + gc->semi_size) {
+          ape_error(A, "out of memory");
+          return NULL;
+        }
+  }
+
+  objs = gc->head;
+  gc->head += n;
+
+  while (n-- > 0) {
+    ape_Object *obj = objs + n;
+
+    if (type(obj) != APE_TFORWARD)
+      handle_gc(A, obj);
+
+    memset(obj, 0, sizeof(ape_Object));
+  }
+
+  return objs;
+}
+
+static ape_Object *create_object(ape_State *A) {
+  ape_Object *obj = halloc(A, 1);
+  ape_pushgc(A, obj);
+  return obj;
+}
+
+/*                            Environment
+ *           +--------+--------+     +--------+--------+
+ *           | frames |   +----+-----+ frames |   nil  |
+ *           +---+----+--------+     +--------+--------+
+ *               |
+ *      +--------+--------+     +--------+--------+
+ *      | frame1 |   +----+-----+ frame2 |   nil  |
+ *      +---+----+--------+     +---+----+--------+
+ *          |                       |
+ * +--------+--------+     +--------+--------+
+ * | Symbol | Object |     | Symbol | Object |
+ * +--------+--------+     +--------+--------+
+ */
 
 static ape_Object *create_env(ape_State *A, ape_Object *parent) {
   return ape_cons(A, &nil, parent);
@@ -386,11 +595,10 @@ static ape_Object *create_env(ape_State *A, ape_Object *parent) {
 extern void stdlib_open(ape_State *A);
 
 static ape_State *ape_init(ape_State *A) {
-  int i, top = ape_savegc(A);
-
+  int i, gctop = ape_savegc(A);
+  
   /* init lists */
   A->calllist = &nil;
-  A->freelist = &nil;
   A->symlist = &nil;
 
   /* global environment */
@@ -414,13 +622,13 @@ static ape_State *ape_init(ape_State *A) {
 
   /* register built in primitives */
   for (i = 0; i < P_MAX; ++i) {
-    ape_Object *v = alloc(A);
+    ape_Object *v = create_object(A);
 
     settype(v, APE_TPRIM);
     prim(v) = i;
 
     ape_def(A, A->primsyms[i], v, NULL);
-    ape_restoregc(A, top);
+    ape_restoregc(A, gctop);
   }
 
   stdlib_open(A);
@@ -440,19 +648,17 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
   A->alloc = alloc;
   A->ud = ud;
 
+  /* init GC */
+  if (gc_create(A, GCSTACKSIZE) < 0) {
+    ape_close(A);
+    return NULL;
+  }
+
   return ape_init(A);
 }
 
 void ape_close(ape_State *A) {
-  ape_Chunk *chunk = A->chunks;
-
-  /* free all chunks */
-  while (chunk) {
-    ape_Chunk *next = chunk->next;
-    ape_free(A, chunk);
-    chunk = next;
-  }
-
+  gc_destroy(A);
   ape_free(A, A);
 }
 
@@ -472,7 +678,7 @@ static void raise_error(ape_State *A, const char *errmsg) {
   fprintf(stderr, "error: %s\n", errmsg);
 
   for (; !isnil(cl); cl = cdr(cl)) {
-    char buf[128];
+    char buf[256];
     ape_tostring(A, car(cl), buf, sizeof(buf));
     fprintf(stderr, "=> %s\n", buf);
   }
@@ -494,47 +700,23 @@ int ape_error(ape_State *A, const char *format, ...) {
 }
 
 void ape_pushgc(ape_State *A, ape_Object *obj) {
-  if (A->gcstack_idx == GCSTACKSIZE)
-    ape_error(A, "gc stack overflow");
-
-  A->gcstack[A->gcstack_idx++] = obj;
+  GC *gc = &A->gc;
+  stack_push(A, &gc->stack, obj);
 }
 
-void ape_restoregc(ape_State *A, int idx) { A->gcstack_idx = idx; }
+void ape_popgc(ape_State *A) {
+  GC *gc = &A->gc;
+  stack_pop(A, &gc->stack);
+}
 
-int ape_savegc(ape_State *A) { return A->gcstack_idx; }
+void ape_restoregc(ape_State *A, int idx) {
+  GC *gc = &A->gc;
+  stack_settop(&gc->stack, idx);
+}
 
-void ape_mark(ape_State *A, ape_Object *obj) {
-  ape_Object *car;
-
-LOOP:
-  if (!obj)
-    return;
-
-  if (tag(obj) & GCMARKBIT)
-    return;
-
-  /* store car before modifying it with GCMARKBIT */
-  car = car(obj);
-  tag(obj) |= GCMARKBIT;
-
-  switch (type(obj)) {
-  case APE_TPAIR:
-    ape_mark(A, car);
-    /* fall through */
-  case APE_TFUNC:
-  case APE_TMACRO:
-  case APE_TSYMBOL:
-  case APE_TSTRING:
-  case APE_TVECTOR:
-    obj = cdr(obj);
-    goto LOOP;
-
-  case APE_TPTR:
-    if (A->handlers.mark)
-      A->handlers.mark(A, obj);
-    break;
-  }
+int ape_savegc(ape_State *A) {
+  GC *gc = &A->gc;
+  return stack_gettop(&gc->stack);
 }
 
 int ape_length(ape_State *A, ape_Object *obj) {
@@ -592,13 +774,15 @@ int ape_equal(ape_State *A, ape_Object *a, ape_Object *b) {
 }
 
 ape_Object *ape_checktype(ape_State *A, ape_Object *obj, int type) {
-  if (type(obj) != type)
+  if (type(obj) != type) {
     ape_error(A, "expected %s, got %s", typenames[type], typenames[type(obj)]);
+    return NULL;
+  }
   return obj;
 }
 
 ape_Object *ape_cons(ape_State *A, ape_Object *car, ape_Object *cdr) {
-  ape_Object *obj = alloc(A);
+  ape_Object *obj = create_object(A);
   car(obj) = car;
   cdr(obj) = cdr;
   return obj;
@@ -651,7 +835,7 @@ ape_Object *ape_integer(ape_State *A, long long n) {
 }
 
 ape_Object *ape_number(ape_State *A, double n) {
-  ape_Object *obj = alloc(A);
+  ape_Object *obj = create_object(A);
   settype(obj, APE_TNUMBER);
   number(obj) = (floatptr_t)n;
   return obj;
@@ -668,7 +852,7 @@ static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
       return obj;
 
     cdr(tail) = obj;
-    A->gcstack_idx--;
+    ape_popgc(A);
 
     tail = obj;
   }
@@ -685,7 +869,7 @@ static ape_Object *build_string(ape_State *A, ape_Object *tail, int ch) {
 }
 
 static int string_ref(ape_State *A, ape_Object *str, int idx) {
-  int cnt;
+  int cnt = 0;
 
   while (idx >= 0) {
     cnt = strcnt(str);
@@ -696,12 +880,16 @@ static int string_ref(ape_State *A, ape_Object *str, int idx) {
     str = cdr(str);
     idx -= cnt;
 
-    if (isnil(str))
+    if (isnil(str)) {
       ape_error(A, "index out of range");
+      return 0;
+    }
   }
 
-  if (cnt == 0)
+  if (cnt == 0) {
     ape_error(A, "index out of range");
+    return 0;
+  }
 
   return strbuf(str)[idx];
 }
@@ -766,7 +954,7 @@ static int streq(ape_Object *obj, const char *str) {
 
 static ape_Object *symbol(ape_State *A, limb_t h, const char *name, int len,
                           int pushlist) {
-  ape_Object *obj = alloc(A);
+  ape_Object *obj = create_object(A);
 
   settype(obj, APE_TSYMBOL);
   hash(obj) = h;
@@ -802,91 +990,32 @@ ape_Object *ape_symbol(ape_State *A, const char *name) {
   return symbol(A, h, name, len, 1);
 }
 
-/*              Vector(7)
- * +---------------------+----------+
- * | +--------+--------+ |          |
- * | | Vector | length | |          |
- * | +--------+--------+ |          |
- * +---------------------+----+-----+
- *                            |
- *                   +--------+--------+
- *                   +        |        +
- *                  /+--------+--------+\
- *                 /                     \
- *                /                       \
- *               /                         \
- *        +-----+-----+               +-----+-----+
- *        |     |     |               |     |     |
- *        +--+--+--+--+               +--+--+--+--+
- *          /       \                   /       \
- *         /         \                 /         \
- *        /           \               /           \
- * +-----+-----+ +-----+-----+ +-----+-----+ +-----+-----+
- * |  0  |  1  | |  2  |  3  | |  4  |  5  | |  6  | nil |
- * +-----+-----+ +-----+-----+ +-----+-----+ +-----+-----+
+/*                          Vector(5)
+ * +---------------------+-------------------------------------------+
+ * | +--------+--------+ | +-----+-----+ +-----+-----+ +-----+-----+ |
+ * | | Vector | length | | |  0  |  1  | |  2  |  3  | |  4  | nil | |
+ * | +--------+--------+ | +-----+-----+ +-----+-----+ +-----+-----+ |
+ * +---------------------+-------------------------------------------+
  */
-
-static int next_power(int size) {
-  if (size < 2)
-    return 2;
-
-  /* fast check if power of two */
-  if (0 == (size & (size - 1)))
-    return size;
-
-  size -= 1;
-  size |= size >> 1;
-  size |= size >> 2;
-  size |= size >> 4;
-  size |= size >> 8;
-  size |= size >> 16;
-  size += 1;
-
-  return size;
-}
 
 ape_Object *ape_vector(ape_State *A, int len) {
   ape_Object *obj;
 
-  if (len < 1)
+  if (len < 1) {
     ape_error(A, "vector length must greater than zero");
+    return NULL;
+  }
 
-  if (len > MAXVECSIZE)
-    ape_error(A, "vector too long");
-
-  obj = alloc(A);
+  obj = create_object(A);
   settype(obj, APE_TVECTOR);
   veclen(obj) = len;
-  cdr(obj) = &nil;
+  cdr(obj) = halloc(A, (len >> 1) + (len & 1));
 
   return obj;
 }
 
-static ape_Object **vector_place(ape_State *A, ape_Object **vec, int dim,
-                                 int pos, int build) {
-  while (1) {
-    if (isnil(*vec)) {
-      if (build) {
-        int gctop = ape_savegc(A);
-        *vec = ape_cons(A, &nil, &nil);
-        ape_restoregc(A, gctop);
-      } else
-        return NULL;
-    }
-
-    dim = dim >> 1;
-
-    if (dim < 2)
-      return pos & dim ? &cdr(*vec) : &car(*vec);
-
-    if (pos < dim)
-      vec = &car(*vec);
-    else {
-      pos -= dim;
-      vec = &cdr(*vec);
-    }
-  }
-  return NULL;
+static ape_Object **vector_place(ape_Object *vec, int index) {
+  return (index & 1) == 0 ? &car(&vec[index >> 1]) : &cdr(&vec[index >> 1]);
 }
 
 ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
@@ -894,27 +1023,31 @@ ape_Object *ape_vecset(ape_State *A, ape_Object *vec, int pos,
   int len = (int)veclen(ape_checktype(A, vec, APE_TVECTOR));
   ape_Object **place;
 
-  if (pos >= len)
+  if (pos >= len) {
     ape_error(A, "vector out of range");
+    return NULL;
+  }
 
-  place = vector_place(A, &cdr(vec), next_power(len), pos, 1);
+  place = vector_place(cdr(vec), pos);
 
-  if (!place)
+  if (!place) {
     ape_error(A, "vector place not found");
+    return NULL;
+  }
 
   *place = obj;
   return vec;
 }
 
 ape_Object *ape_cfunc(ape_State *A, ape_CFunc fn) {
-  ape_Object *obj = alloc(A);
+  ape_Object *obj = create_object(A);
   settype(obj, APE_TCFUNC);
   cfunc(obj) = fn;
   return obj;
 }
 
 ape_Object *ape_ptr(ape_State *A, void *ptr, int subtype) {
-  ape_Object *obj = alloc(A);
+  ape_Object *obj = create_object(A);
   settype(obj, APE_TPTR);
   cdr(obj) = (ape_Object *)ptr;
   ptrtype(obj) = subtype & 0xFFFF;
@@ -970,8 +1103,10 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
     while (idx-- > 0) {
       obj = cdr(obj);
 
-      if (isnil(obj))
+      if (isnil(obj)) {
         ape_error(A, "index out of range");
+        return NULL;
+      }
     }
     return car(obj);
 
@@ -984,10 +1119,12 @@ ape_Object *ape_nth(ape_State *A, ape_Object *obj, int idx) {
     int cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
     ape_Object **place;
 
-    if (idx >= cnt)
+    if (idx >= cnt) {
       ape_error(A, "index out of range");
+      return NULL;
+    }
 
-    place = vector_place(A, &cdr(obj), next_power(cnt), idx, 0);
+    place = vector_place(cdr(obj), idx);
     return place ? *place : &nil;
   }
 
@@ -1100,8 +1237,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     ape_pushgc(A, res); /* to cause error on too-deep nesting */
 
     while ((v = reader(A, fn, udata)) != &rparen) {
-      if (v == NULL)
+      if (v == NULL) {
         ape_error(A, "unclosed list");
+        return NULL;
+      }
 
       if (type(v) == APE_TSYMBOL && strleq(cdr(v), ".", 1))
         /* dotted pair */
@@ -1119,8 +1258,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   case '\'':
     v = ape_read(A, fn, udata);
 
-    if (!v)
+    if (!v) {
       ape_error(A, "stray '''");
+      return NULL;
+    }
 
     /* Transform: '(...) => (quote (...)) */
     return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, &nil));
@@ -1128,8 +1269,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   case '#':
     v = ape_read(A, fn, udata);
 
-    if (!v)
+    if (!v) {
       ape_error(A, "stray '#'");
+      return NULL;
+    }
 
     /* Transform: #(...) => (vector ...) */
     return ape_cons(A, A->primsyms[P_VECTOR], ape_checktype(A, v, APE_TPAIR));
@@ -1137,8 +1280,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   case '`':
     v = ape_read(A, fn, udata);
 
-    if (!v)
+    if (!v) {
       ape_error(A, "stray '`'");
+      return NULL;
+    }
 
     /* Transform: `(...) => (quasiquote (...)) */
     return ape_cons(A, A->primsyms[P_QUASIQUOTE], ape_cons(A, v, &nil));
@@ -1151,8 +1296,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     v = ape_read(A, fn, udata);
 
-    if (!v)
+    if (!v) {
       ape_error(A, "stray ','");
+      return NULL;
+    }
 
     res = ape_cons(A, v, &nil);
 
@@ -1169,14 +1316,18 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 
     ch = fn(A, udata);
     while (ch != '"') {
-      if (ch == '\0')
+      if (ch == '\0') {
         ape_error(A, "unclosed string");
+        return NULL;
+      }
 
       if (ch == '\\') {
         ch = fn(A, udata);
 
-        if (ch == '\0')
+        if (ch == '\0') {
           ape_error(A, "unclosed string");
+          return NULL;
+        }
 
         if (strchr("nrt\\\"", ch))
           ch = strchr("n\nr\rt\t\\\\\"\"", ch)[1];
@@ -1190,8 +1341,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   default:
     p = buf;
     do {
-      if (p == buf + sizeof(buf) - 1)
+      if (p == buf + sizeof(buf) - 1) {
         ape_error(A, "symbol too long");
+        return NULL;
+      }
 
       *p++ = ch;
       ch = fn(A, udata);
@@ -1216,9 +1369,10 @@ static ape_Object *reader(ape_State *A, ape_ReadFunc fn, void *udata) {
 ape_Object *ape_read(ape_State *A, ape_ReadFunc fn, void *udata) {
   ape_Object *obj = reader(A, fn, udata);
 
-  if (obj == &rparen)
+  if (obj == &rparen) {
     ape_error(A, "stray ')'");
-
+    return NULL;
+  }
   return obj;
 }
 
@@ -1383,8 +1537,10 @@ ape_Object *ape_def(ape_State *A, ape_Object *sym, ape_Object *val,
 
   frame = getbound(sym, env, ENV_CREATE);
 
-  if (!isnil(*frame))
+  if (!isnil(*frame)) {
     ape_error(A, "variables cannot be redefined");
+    return NULL;
+  }
 
   bound = ape_cons(A, sym, val);
   *frame = ape_cons(A, bound, &nil);
@@ -1400,8 +1556,10 @@ ape_Object *ape_set(ape_State *A, ape_Object *sym, ape_Object *val,
 
   frame = getbound(sym, env, ENV_RECUR);
 
-  if (!frame || isnil(*frame))
+  if (!frame || isnil(*frame)) {
     ape_error(A, "unbound variables cannot be set");
+    return NULL;
+  }
 
   bound = car(*frame);
   cdr(bound) = val;
@@ -1412,10 +1570,13 @@ ape_Object *ape_nextarg(ape_State *A, ape_Object **args) {
   ape_Object *arg = *args;
 
   if (type(arg) != APE_TPAIR) {
-    if (isnil(arg))
+    if (isnil(arg)) {
       ape_error(A, "too few arguments");
+      return NULL;
+    }
 
     ape_error(A, "dotted pair in argument list");
+    return NULL;
   }
 
   *args = cdr(arg);
@@ -1455,8 +1616,10 @@ static ape_Object *arith_sub(ape_State *A, ape_Object *args, ape_Object *env) {
   floatptr_t res;
   ape_Object *x;
 
-  if (isnil(args))
+  if (isnil(args)) {
     ape_error(A, "wrong number of operands");
+    return NULL;
+  }
 
   x = ape_checktype(A, evalarg(), APE_TNUMBER);
 
@@ -1484,8 +1647,10 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   floatptr_t res;
   ape_Object *x;
 
-  if (isnil(args))
+  if (isnil(args)) {
     ape_error(A, "wrong number of operands");
+    return NULL;
+  }
 
   x = ape_checktype(A, evalarg(), APE_TNUMBER);
 
@@ -1497,8 +1662,10 @@ static ape_Object *arith_div(ape_State *A, ape_Object *args, ape_Object *env) {
   }
 
   do {
-    if (fabs(number(x) - (floatptr_t)0) < FP_EPSILON)
+    if (fabs(number(x) - (floatptr_t)0) < FP_EPSILON) {
       ape_error(A, "division by zero");
+      return NULL;
+    }
 
     res /= number(x);
 
@@ -1550,8 +1717,10 @@ static void args_binds(ape_State *A, ape_Object *syms, ape_Object *args,
     if (isnil(args)) {
       ape_Object *arg;
 
-      if (type(bind) != APE_TPAIR)
+      if (type(bind) != APE_TPAIR) {
         ape_error(A, "wrong number of arguments");
+        return;
+      }
 
       arg = cdr(bind);
       /* default argument */
@@ -1668,8 +1837,10 @@ EVAL:
 
     frame = getbound(expr, env, ENV_RECUR);
 
-    if (!frame || isnil(*frame))
+    if (!frame || isnil(*frame)) {
       ape_error(A, "unbound variables");
+      return NULL;
+    }
 
     bound = car(*frame);
     /* Prevent local variables from being accidentally GC */
@@ -1718,7 +1889,7 @@ EVAL:
     case P_MACRO:
       va = ape_cons(A, env, ape_nextarg(A, &args));
       vb = ape_cons(A, A->primsyms[P_DO], args);
-      res = alloc(A);
+      res = create_object(A);
       settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
       cdr(res) = ape_cons(A, va, vb);
       break;
@@ -1887,8 +2058,10 @@ ape_Object *ape_load(ape_State *A, const char *file, ape_Object *env) {
 
   fp = fopen(file, "rb");
 
-  if (!fp)
+  if (!fp) {
     ape_error(A, "could not open input file");
+    return NULL;
+  }
 
   env = env ? env : A->env;
   gctop = ape_savegc(A);

@@ -15,8 +15,8 @@
 #include <stdio.h>
 
 #define APE_MAJOR 0
-#define APE_MINOR 2
-#define APE_PATCH 1
+#define APE_MINOR 3
+#define APE_PATCH 0
 
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
@@ -42,7 +42,7 @@ typedef struct ape_Object ape_Object;
 typedef struct ape_State ape_State;
 typedef ape_Object *(*ape_CFunc)(ape_State *A, int argc, ape_Object *args,
                                  ape_Object *env);
-typedef void (*ape_MemoryFunc)(ape_State *A, ape_Object *obj);
+typedef void (*ape_GCFunc)(ape_State *A, void *ptr, int subtype);
 typedef void (*ape_ErrorFunc)(ape_State *A, const char *errmsg, ape_Object *cl);
 typedef void (*ape_WriteFunc)(ape_State *A, void *udata, char ch);
 typedef char (*ape_ReadFunc)(ape_State *A, void *udata);
@@ -51,13 +51,12 @@ typedef void *(*ape_Alloc)(void *ud, void *ptr, size_t size);
 
 typedef struct {
   ape_ErrorFunc error;
-  ape_MemoryFunc mark;
-  ape_MemoryFunc gc;
+  ape_GCFunc gc;
 } ape_Handlers;
 
 enum {
   APE_TPAIR,
-  APE_TFREE,
+  APE_TFORWARD,
   APE_TNIL,
   APE_TNUMBER,
   APE_TSYMBOL,
@@ -78,9 +77,10 @@ APE_API ape_Handlers *ape_handlers(ape_State *A);
 APE_API int ape_error(ape_State *A, const char *format, ...);
 
 APE_API void ape_pushgc(ape_State *A, ape_Object *obj);
+APE_API void ape_popgc(ape_State *A);
+
 APE_API void ape_restoregc(ape_State *A, int idx);
 APE_API int ape_savegc(ape_State *A);
-APE_API void ape_mark(ape_State *A, ape_Object *obj);
 
 APE_API int ape_length(ape_State *A, ape_Object *obj);
 APE_API int ape_isnil(ape_State *A, ape_Object *obj);
