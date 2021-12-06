@@ -91,7 +91,6 @@ APE_API ape_Object ape_car(ape_State *A, ape_Object obj);
 APE_API ape_Object ape_cdr(ape_State *A, ape_Object obj);
 APE_API ape_Object ape_setcar(ape_State *A, ape_Object obj, ape_Object car);
 APE_API ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr);
-APE_API ape_Object ape_list(ape_State *A, ape_Object *objs, int cnt);
 APE_API ape_Object ape_true(ape_State *A);
 APE_API ape_Object ape_nil(ape_State *A);
 APE_API ape_Object ape_bool(ape_State *A, int b);
@@ -109,7 +108,6 @@ APE_API ape_Object ape_ptr(ape_State *A, void *ptr, int subtype);
 APE_API ape_Object ape_gensym(ape_State *A);
 APE_API ape_Object ape_reverse(ape_State *A, ape_Object obj);
 APE_API ape_Object ape_nth(ape_State *A, ape_Object obj, int idx);
-APE_API ape_Object ape_append(ape_State *A, ape_Object objs);
 
 APE_API long long ape_tointeger(ape_State *A, ape_Object obj);
 APE_API double ape_tonumber(ape_State *A, ape_Object obj);

@@ -810,15 +810,6 @@ ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr) {
   return obj;
 }
 
-ape_Object ape_list(ape_State *A, ape_Object *objs, int cnt) {
-  ape_Object list = nil;
-
-  while (cnt--)
-    list = ape_cons(A, objs[cnt], list);
-
-  return list;
-}
-
 ape_Object ape_true(ape_State *A) { return A->t; }
 
 ape_Object ape_nil(ape_State *A) {
@@ -1132,26 +1123,6 @@ ape_Object ape_nth(ape_State *A, ape_Object obj, int idx) {
     break;
   }
   return nil;
-}
-
-ape_Object ape_append(ape_State *A, ape_Object objs) {
-  ape_Object res = nil;
-  ape_Object *tail = &res;
-
-  while (!isnil(objs)) {
-    ape_Object obj = ape_nextarg(A, &objs);
-
-    if (type(obj) != APE_TPAIR && isnil(objs)) {
-      *tail = obj;
-      return res;
-    }
-
-    while (!isnil(obj)) {
-      *tail = ape_cons(A, ape_nextarg(A, &obj), nil);
-      tail = &cdr(*tail);
-    }
-  }
-  return res;
 }
 
 long long ape_tointeger(ape_State *A, ape_Object obj) {

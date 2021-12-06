@@ -166,11 +166,6 @@ static ape_Object string_tovector(ape_State *A, int argc, ape_Object args,
   return vec;
 }
 
-static ape_Object list(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return args;
-}
-
 static ape_Object concat(ape_State *A, int argc, ape_Object args,
                          ape_Object env) {
   return ape_concat(A, args);
@@ -189,11 +184,6 @@ static ape_Object reverse(ape_State *A, int argc, ape_Object args,
 static ape_Object nth(ape_State *A, int argc, ape_Object args, ape_Object env) {
   int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
   return ape_nth(A, ape_nextarg(A, &args), index);
-}
-
-static ape_Object append(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_append(A, args);
 }
 
 static ape_Object assoc(ape_State *A, int argc, ape_Object args,
@@ -424,6 +414,9 @@ static ape_Object unbound(ape_State *A, int argc, ape_Object args,
   return ape_unbound(A, ape_nextarg(A, &args), env, 1);
 }
 
+static const char list[] = {"                                                  \
+(def list (fn x x))"};
+
 static const char defmacro[] = {"                                              \
 (def defmacro (macro (name args . body)                                        \
   `(def ,name (macro ,args ,@body))))"};
@@ -567,7 +560,10 @@ static const char cond[] = {"                                                  \
 
 static const char apply[] = {"                                                 \
 (defn apply (op args)                                                          \
-  (eval (cons op args)))"};
+  (eval (cons op                                                               \
+              (map (fn (arg)                                                   \
+                    (list 'quote arg))                                         \
+                args))))"};
 
 static const char when[] = {"                                                  \
 (defmacro when (test . body)                                                   \
@@ -591,6 +587,14 @@ static const char for_[] = {"                                                  \
          (let (,item (car ,iter))                                              \
            (set! ,iter (cdr ,iter))                                            \
            ,@body)))))"};
+
+static const char append[] = {"                                                \
+(defn append (l1 . more)                                                       \
+  (if (not more) l1                                                            \
+    (if (not l1)                                                               \
+        (apply append more)                                                    \
+      (cons (car l1)                                                           \
+            (apply append (cons (cdr l1) more))))))"};
 
 static const char map[] = {"                                                   \
 (defn map (proc list)                                                          \
@@ -648,12 +652,10 @@ void stdlib_open(ape_State *A) {
       {"string", string},
       {"string->list", string_tolist},
       {"string->vector", string_tovector},
-      {"list", list},
       {"concat", concat},
       {"length", length},
       {"reverse", reverse},
       {"nth", nth},
-      {"append", append},
       {"assoc", assoc},
       {"get", get},
       {"symbol", symbol},
@@ -690,11 +692,12 @@ void stdlib_open(ape_State *A) {
       {NULL, NULL},
   };
   const char *stdlib[] = {
-      defmacro, defn,   caar,   cadr,   cdar,   cddr,   caaar,  caadr,  cadar,
-      caddr,    cdaar,  cdadr,  cddar,  cdddr,  caaaar, caaadr, caadar, caaddr,
-      cadaar,   cadadr, caddar, cadddr, cdaaar, cdaadr, cdadar, cdaddr, cddaar,
-      cddadr,   cdddar, cddddr, let,    cond,   apply,  when,   unless, while_,
-      for_,     map,    filter, reduce, acons,  push,   pop,    NULL,
+      list,   defmacro, defn,   caar,   cadr,   cdar,   cddr,   caaar,
+      caadr,  cadar,    caddr,  cdaar,  cdadr,  cddar,  cdddr,  caaaar,
+      caaadr, caadar,   caaddr, cadaar, cadadr, caddar, cadddr, cdaaar,
+      cdaadr, cdadar,   cdaddr, cddaar, cddadr, cdddar, cddddr, let,
+      cond,   apply,    when,   unless, while_, for_,   append, map,
+      filter, reduce,   acons,  push,   pop,    NULL,
   };
   int gctop = ape_savegc(A);
 
