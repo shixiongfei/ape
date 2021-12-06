@@ -20,146 +20,6 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
-static ape_Object caar(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return ape_car(A, ape_car(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object cadr(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return ape_car(A, ape_cdr(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object cdar(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return ape_cdr(A, ape_car(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object cddr(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return ape_cdr(A, ape_cdr(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object caaar(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_car(A, caar(A, argc, args, env));
-}
-
-static ape_Object caadr(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_car(A, cadr(A, argc, args, env));
-}
-
-static ape_Object cadar(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_car(A, cdar(A, argc, args, env));
-}
-
-static ape_Object caddr(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_car(A, cddr(A, argc, args, env));
-}
-
-static ape_Object cdaar(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_cdr(A, caar(A, argc, args, env));
-}
-
-static ape_Object cdadr(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_cdr(A, cadr(A, argc, args, env));
-}
-
-static ape_Object cddar(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_cdr(A, cdar(A, argc, args, env));
-}
-
-static ape_Object cdddr(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return ape_cdr(A, cddr(A, argc, args, env));
-}
-
-static ape_Object caaaar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, caaar(A, argc, args, env));
-}
-
-static ape_Object caaadr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, caadr(A, argc, args, env));
-}
-
-static ape_Object caadar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, cadar(A, argc, args, env));
-}
-
-static ape_Object caaddr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, caddr(A, argc, args, env));
-}
-
-static ape_Object cadaar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, cdaar(A, argc, args, env));
-}
-
-static ape_Object cadadr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, cdadr(A, argc, args, env));
-}
-
-static ape_Object caddar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, cddar(A, argc, args, env));
-}
-
-static ape_Object cadddr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_car(A, cdddr(A, argc, args, env));
-}
-
-static ape_Object cdaaar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, caaar(A, argc, args, env));
-}
-
-static ape_Object cdaadr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, caadr(A, argc, args, env));
-}
-
-static ape_Object cdadar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, cadar(A, argc, args, env));
-}
-
-static ape_Object cdaddr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, caddr(A, argc, args, env));
-}
-
-static ape_Object cddaar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, cdaar(A, argc, args, env));
-}
-
-static ape_Object cddadr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, cdadr(A, argc, args, env));
-}
-
-static ape_Object cdddar(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, cddar(A, argc, args, env));
-}
-
-static ape_Object cddddr(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_cdr(A, cdddr(A, argc, args, env));
-}
-
 static ape_Object istype(ape_State *A, ape_Object obj, int type) {
   return ape_bool(A, ape_type(A, obj) == type);
 }
@@ -572,6 +432,118 @@ static const char defn[] = {"                                                  \
 (defmacro defn (name args . body)                                              \
   `(def ,name (fn ,args ,@body)))"};
 
+static const char caar[] = {"                                                  \
+(defn caar (list)                                                              \
+  (car (car list)))"};
+
+static const char cadr[] = {"                                                  \
+(defn cadr (list)                                                              \
+  (car (cdr list)))"};
+
+static const char cdar[] = {"                                                  \
+(defn cdar (list)                                                              \
+  (cdr (car list)))"};
+
+static const char cddr[] = {"                                                  \
+(defn cddr (list)                                                              \
+  (cdr (cdr list)))"};
+
+static const char caaar[] = {"                                                 \
+(defn caaar (list)                                                             \
+  (car (caar list)))"};
+
+static const char caadr[] = {"                                                 \
+(defn caadr (list)                                                             \
+  (car (cadr list)))"};
+
+static const char cadar[] = {"                                                 \
+(defn cadar (list)                                                             \
+  (car (cdar list)))"};
+
+static const char caddr[] = {"                                                 \
+(defn caddr (list)                                                             \
+  (car (cddr list)))"};
+
+static const char cdaar[] = {"                                                 \
+(defn cdaar (list)                                                             \
+  (cdr (caar list)))"};
+
+static const char cdadr[] = {"                                                 \
+(defn cdadr (list)                                                             \
+  (cdr (cadr list)))"};
+
+static const char cddar[] = {"                                                 \
+(defn cddar (list)                                                             \
+  (cdr (cdar list)))"};
+
+static const char cdddr[] = {"                                                 \
+(defn cdddr (list)                                                             \
+  (cdr (cddr list)))"};
+
+static const char caaaar[] = {"                                                \
+(defn caaaar (list)                                                            \
+  (car (caaar list)))"};
+
+static const char caaadr[] = {"                                                \
+(defn caaadr (list)                                                            \
+  (car (caadr list)))"};
+
+static const char caadar[] = {"                                                \
+(defn caadar (list)                                                            \
+  (car (cadar list)))"};
+
+static const char caaddr[] = {"                                                \
+(defn caaddr (list)                                                            \
+  (car (caddr list)))"};
+
+static const char cadaar[] = {"                                                \
+(defn cadaar (list)                                                            \
+  (car (cdaar list)))"};
+
+static const char cadadr[] = {"                                                \
+(defn cadadr (list)                                                            \
+  (car (cdadr list)))"};
+
+static const char caddar[] = {"                                                \
+(defn caddar (list)                                                            \
+  (car (cddar list)))"};
+
+static const char cadddr[] = {"                                                \
+(defn cadddr (list)                                                            \
+  (car (cdddr list)))"};
+
+static const char cdaaar[] = {"                                                \
+(defn cdaaar (list)                                                            \
+  (cdr (caaar list)))"};
+
+static const char cdaadr[] = {"                                                \
+(defn cdaadr (list)                                                            \
+  (cdr (caadr list)))"};
+
+static const char cdadar[] = {"                                                \
+(defn cdadar (list)                                                            \
+  (cdr (cadar list)))"};
+
+static const char cdaddr[] = {"                                                \
+(defn cdaddr (list)                                                            \
+  (cdr (caddr list)))"};
+
+static const char cddaar[] = {"                                                \
+(defn cddaar (list)                                                            \
+  (cdr (cdaar list)))"};
+
+static const char cddadr[] = {"                                                \
+(defn cddadr (list)                                                            \
+  (cdr (cdadr list)))"};
+
+static const char cdddar[] = {"                                                \
+(defn cdddar (list)                                                            \
+  (cdr (cddar list)))"};
+
+static const char cddddr[] = {"                                                \
+(defn cddddr (list)                                                            \
+  (cdr (cdddr list)))"};
+
 static const char let[] = {"                                                   \
 (defmacro let (binds . body)                                                   \
   ((fn ()                                                                      \
@@ -658,34 +630,6 @@ static const char pop[] = {"                                                   \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
-      {"caar", caar},
-      {"cadr", cadr},
-      {"cdar", cdar},
-      {"cddr", cddr},
-      {"caaar", caaar},
-      {"caadr", caadr},
-      {"cadar", cadar},
-      {"caddr", caddr},
-      {"cdaar", cdaar},
-      {"cdadr", cdadr},
-      {"cddar", cddar},
-      {"cdddr", cdddr},
-      {"caaaar", caaaar},
-      {"caaadr", caaadr},
-      {"caadar", caadar},
-      {"caaddr", caaddr},
-      {"cadaar", cadaar},
-      {"cadadr", cadadr},
-      {"caddar", caddar},
-      {"cadddr", cadddr},
-      {"cdaaar", cdaaar},
-      {"cdaadr", cdaadr},
-      {"cdadar", cdadar},
-      {"cdaddr", cdaddr},
-      {"cddaar", cddaar},
-      {"cddadr", cddadr},
-      {"cdddar", cdddar},
-      {"cddddr", cddddr},
       {"nil?", nilp},
       {"pair?", pairp},
       {"number?", numberp},
@@ -746,8 +690,11 @@ void stdlib_open(ape_State *A) {
       {NULL, NULL},
   };
   const char *stdlib[] = {
-      defmacro, defn, let,    cond,   apply, when, unless, while_,
-      for_,     map,  filter, reduce, acons, push, pop,    NULL,
+      defmacro, defn,   caar,   cadr,   cdar,   cddr,   caaar,  caadr,  cadar,
+      caddr,    cdaar,  cdadr,  cddar,  cdddr,  caaaar, caaadr, caadar, caaddr,
+      cadaar,   cadadr, caddar, cadddr, cdaaar, cdaadr, cdadar, cdaddr, cddaar,
+      cddadr,   cdddar, cddddr, let,    cond,   apply,  when,   unless, while_,
+      for_,     map,    filter, reduce, acons,  push,   pop,    NULL,
   };
   int gctop = ape_savegc(A);
 
