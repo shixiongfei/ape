@@ -562,8 +562,8 @@ static const char apply[] = {"                                                 \
 (defn apply (op args)                                                          \
   (eval (cons op                                                               \
               (map (fn (arg)                                                   \
-                    (list 'quote arg))                                         \
-                args))))"};
+                     (list 'quote arg))                                        \
+                   args))))"};
 
 static const char when[] = {"                                                  \
 (defmacro when (test . body)                                                   \
@@ -589,12 +589,12 @@ static const char for_[] = {"                                                  \
            ,@body)))))"};
 
 static const char append[] = {"                                                \
-(defn append (l1 . more)                                                       \
-  (if (not more) l1                                                            \
-    (if (not l1)                                                               \
+(defn append (list . more)                                                     \
+  (if (not more) list                                                          \
+    (if (not list)                                                             \
         (apply append more)                                                    \
-      (cons (car l1)                                                           \
-            (apply append (cons (cdr l1) more))))))"};
+      (cons (car list)                                                         \
+            (apply append (cons (cdr list) more))))))"};
 
 static const char map[] = {"                                                   \
 (defn map (proc list)                                                          \
