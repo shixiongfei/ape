@@ -8,7 +8,7 @@
 -- https://github.com/shixiongfei/ape
 --
 
-solution ( "ape" )
+workspace ( "ape" )
   configurations { "Release", "Debug" }
   platforms { "x64", "x32" }
 
@@ -36,27 +36,27 @@ solution ( "ape" )
   defines { "_UNICODE" }
   staticruntime "On"
 
-  configuration ( "Release" )
+  filter ( "configurations:Release" )
     optimize "On"
     defines { "NDEBUG", "_NDEBUG" }
 
-  configuration ( "Debug" )
+  filter ( "configurations:Debug" )
     symbols "On"
     defines { "DEBUG", "_DEBUG" }
 
-  configuration ( "vs*" )
+  filter ( "action:vs*" )
     defines { "WIN32", "_WIN32", "_WINDOWS",
               "_CRT_SECURE_NO_WARNINGS", "_CRT_SECURE_NO_DEPRECATE",
               "_CRT_NONSTDC_NO_DEPRECATE", "_WINSOCK_DEPRECATED_NO_WARNINGS" }
 
-  configuration ( "gmake" )
+  filter ( "action:gmake" )
     warnings  "Default" --"Extra"
 
-  configuration { "gmake", "macosx" }
+  filter { "action:gmake", "system:macosx" }
     defines { "__APPLE__", "__MACH__", "__MRC__", "macintosh" }
 
-  configuration { "gmake", "linux" }
+  filter { "action:gmake", "system:linux" }
     defines { "__linux__" }
 
-  configuration { "gmake", "bsd" }
+  filter { "action:gmake", "system:bsd" }
     defines { "__BSD__" }
