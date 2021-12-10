@@ -20,6 +20,14 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
+static ape_Object error(ape_State *A, int argc, ape_Object args,
+                        ape_Object env) {
+  char buf[128] = {0};
+  ape_tostring(A, ape_nextarg(A, &args), buf, sizeof(buf) - 1);
+  ape_error(A, buf);
+  return ape_nil(A);
+}
+
 static ape_Object nilp(ape_State *A, int argc, ape_Object args,
                        ape_Object env) {
   return ape_bool(A, ape_isnil(A, ape_nextarg(A, &args)));
@@ -595,6 +603,15 @@ static const char pop[] = {"                                                   \
        (set! ,place (cdr ,place))                                              \
        ,gx)))"};
 
+static const char list_ref[] = {"                                              \
+(defn list-ref (index list)                                                    \
+  (while (and list (< 0 index))                                                \
+    (set! index (- index 1))                                                   \
+    (set! list (cdr list)))                                                    \
+  (if (= index 0)                                                              \
+      (car list)                                                               \
+    (error \"index out of range\")))"};
+
 static const char string_tolist[] = {"                                         \
 (defn string->list (string)                                                    \
   (def i 0)                                                                    \
@@ -638,6 +655,7 @@ static const char list_tovector[] = {"                                         \
 
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
+      {"error", error},
       {"nil?", nilp},
       {"print", print},
       {"eval", eval},
@@ -684,68 +702,19 @@ void stdlib_open(ape_State *A) {
       {NULL, NULL},
   };
   const char *stdlib[] = {
-      list,
-      defmacro,
-      defn,
-      caar,
-      cadr,
-      cdar,
-      cddr,
-      caaar,
-      caadr,
-      cadar,
-      caddr,
-      cdaar,
-      cdadr,
-      cddar,
-      cdddr,
-      caaaar,
-      caaadr,
-      caadar,
-      caaddr,
-      cadaar,
-      cadadr,
-      caddar,
-      cadddr,
-      cdaaar,
-      cdaadr,
-      cdadar,
-      cdaddr,
-      cddaar,
-      cddadr,
-      cdddar,
-      cddddr,
-      pairp,
-      numberp,
-      symbolp,
-      stringp,
-      vectorp,
-      fnp,
-      macrop,
-      primitivep,
-      cfnp,
-      ptrp,
-      length,
-      reverse,
-      let,
-      cond,
-      apply,
-      when,
-      unless,
-      while_,
-      for_,
-      append,
-      map,
-      filter,
-      reduce,
-      acons,
-      push,
-      pop,
-      string_tolist,
-      string_tovector,
-      vector_tolist,
-      list_tovector,
-      NULL,
+      list,          defmacro,      defn,     caar,          cadr,
+      cdar,          cddr,          caaar,    caadr,         cadar,
+      caddr,         cdaar,         cdadr,    cddar,         cdddr,
+      caaaar,        caaadr,        caadar,   caaddr,        cadaar,
+      cadadr,        caddar,        cadddr,   cdaaar,        cdaadr,
+      cdadar,        cdaddr,        cddaar,   cddadr,        cdddar,
+      cddddr,        pairp,         numberp,  symbolp,       stringp,
+      vectorp,       fnp,           macrop,   primitivep,    cfnp,
+      ptrp,          length,        reverse,  let,           cond,
+      apply,         when,          unless,   while_,        for_,
+      append,        map,           filter,   reduce,        acons,
+      push,          pop,           list_ref, string_tolist, string_tovector,
+      vector_tolist, list_tovector, NULL,
   };
 
   /* c libs */
