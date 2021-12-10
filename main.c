@@ -41,17 +41,14 @@ static int do_file(const char *filename) {
 static int do_repl(void) {
   ape_State *A = ape_newstate(NULL, NULL);
   ape_Object expr;
-  int gctop;
 
   ape_handlers(A)->error = on_error;
   printf("Welcome to Ape v%s\n", APE_RELEASE);
 
-  gctop = ape_savegc(A);
   setjmp(toplevel);
 
   /* repl */
   for (;;) {
-    ape_restoregc(A, gctop);
     printf("%ld| in> ", ++prompt);
 
     expr = ape_readfp(A, stdin);

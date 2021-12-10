@@ -291,7 +291,7 @@ static int stack_create(ape_State *A, Stack *stack, int size) {
 
 static void stack_destroy(ape_State *A, Stack *stack) {
   if (stack->base) {
-    ape_free(A, stack);
+    ape_free(A, stack->base);
     stack->base = NULL;
   }
 
@@ -604,7 +604,7 @@ static ape_Object create_env(ape_State *A, ape_Object parent) {
 extern void stdlib_open(ape_State *A);
 
 static ape_State *ape_init(ape_State *A) {
-  int i, gctop = ape_savegc(A);
+  int i;
 
   /* init lists */
   A->calllist = nil;
@@ -637,7 +637,6 @@ static ape_State *ape_init(ape_State *A) {
     prim(v) = i;
 
     ape_def(A, A->primsyms[i], v, NULL);
-    ape_restoregc(A, gctop);
   }
 
   stdlib_open(A);
@@ -708,47 +707,14 @@ int ape_error(ape_State *A, const char *format, ...) {
   return -1;
 }
 
-void ape_pushgc(ape_State *A, ape_Object obj) { gc_push(A, obj); }
-
-void ape_restoregc(ape_State *A, int idx) {
-  GC *gc = &A->gc;
-  stack_settop(&gc->stack, idx);
-}
-
-int ape_savegc(ape_State *A) {
-  GC *gc = &A->gc;
-  return stack_gettop(&gc->stack);
-}
-
-int ape_length(ape_State *A, ape_Object obj) {
-  int len;
-
-  if (type(obj) == APE_TPAIR) {
-    for (len = 0; !isnil(obj); obj = cdr(obj))
-      len += 1;
-    return len;
-  }
-
-  if (type(obj) == APE_TSTRING) {
-    for (len = 0; !isnil(obj); obj = cdr(obj))
-      len += strcnt(obj);
-    return len;
-  }
-
-  if (type(obj) == APE_TVECTOR)
-    return (int)veclen(obj);
-
-  return ape_error(A, "not an iteratable object");
+int ape_type(ape_State *A, ape_Object obj) {
+  unused(A);
+  return type(obj);
 }
 
 int ape_isnil(ape_State *A, ape_Object obj) {
   unused(A);
   return isnil(obj);
-}
-
-int ape_type(ape_State *A, ape_Object obj) {
-  unused(A);
-  return type(obj);
 }
 
 int ape_equal(ape_State *A, ape_Object a, ape_Object b) {
@@ -901,27 +867,6 @@ ape_Object ape_lstring(ape_State *A, const char *str, int len) {
   return obj;
 }
 
-ape_Object ape_concat(ape_State *A, ape_Object objs) {
-  ape_Object obj = build_string(A, NULL, 0);
-  ape_Object tail = obj;
-  ape_Object str;
-  int i, size;
-
-  while (!isnil(objs)) {
-    str = ape_checktype(A, ape_nextarg(A, &objs), APE_TSTRING);
-
-    while (!isnil(str)) {
-      size = strcnt(str);
-
-      for (i = 0; i < size; ++i)
-        tail = build_string(A, tail, strbuf(str)[i]);
-
-      str = cdr(str);
-    }
-  }
-  return obj;
-}
-
 static int strleq(ape_Object obj, const char *str, int len) {
   int i, j = 0;
 
@@ -1053,77 +998,78 @@ ape_Object ape_gensym(ape_State *A) {
   return symbol(A, fast_hash(gensym, len), gensym, len, 0);
 }
 
-ape_Object ape_reverse(ape_State *A, ape_Object obj) {
-  ape_Object res = nil;
-  ape_Object tail;
-  int i, len;
+ape_Object ape_strref(ape_State *A, ape_Object obj, int idx) {
+  char ch = (char)string_ref(A, ape_checktype(A, obj, APE_TSTRING), idx);
+  return ape_lstring(A, &ch, 1);
+}
 
-  switch (type(obj)) {
-  case APE_TPAIR:
-    for (; !isnil(obj); obj = cdr(obj))
-      res = ape_cons(A, car(ape_checktype(A, obj, APE_TPAIR)), res);
-    break;
+ape_Object ape_vecref(ape_State *A, ape_Object obj, int idx) {
+  int cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
+  ape_Object *place;
 
-  case APE_TSTRING:
-    len = ape_length(A, obj);
-    res = build_string(A, NULL, 0);
-    tail = res;
-
-    for (i = 0; i < len; ++i)
-      tail = build_string(A, tail, string_ref(A, obj, len - i - 1));
-    break;
-
-  case APE_TVECTOR:
-    len = ape_length(A, obj);
-    res = ape_vector(A, len);
-
-    for (i = 0; i < len; ++i)
-      ape_vecset(A, res, i, ape_nth(A, obj, len - i - 1));
-    break;
-
-  default:
-    ape_error(A, "not an iteratable object");
-    break;
+  if (idx >= cnt) {
+    ape_error(A, "index out of range");
+    return NULL;
   }
+
+  place = vector_place(cdr(obj), idx);
+  return place ? *place : nil;
+}
+
+ape_Object ape_strappend(ape_State *A, ape_Object objs) {
+  ape_Object obj = build_string(A, NULL, 0);
+  ape_Object tail = obj;
+  ape_Object str;
+  int i, size;
+
+  while (!isnil(objs)) {
+    str = ape_checktype(A, ape_nextarg(A, &objs), APE_TSTRING);
+
+    while (!isnil(str)) {
+      size = strcnt(str);
+
+      for (i = 0; i < size; ++i)
+        tail = build_string(A, tail, strbuf(str)[i]);
+
+      str = cdr(str);
+    }
+  }
+  return obj;
+}
+
+ape_Object ape_strreverse(ape_State *A, ape_Object obj) {
+  int i, len = ape_strlen(A, ape_checktype(A, obj, APE_TSTRING));
+  ape_Object res = build_string(A, NULL, 0);
+  ape_Object tail = res;
+
+  for (i = 0; i < len; ++i)
+    tail = build_string(A, tail, string_ref(A, obj, len - i - 1));
+
   return res;
 }
 
-ape_Object ape_nth(ape_State *A, ape_Object obj, int idx) {
-  switch (type(obj)) {
-  case APE_TPAIR:
-    while (idx-- > 0) {
-      obj = cdr(obj);
+int ape_length(ape_State *A, ape_Object obj) {
+  int len;
+  obj = ape_checktype(A, obj, APE_TPAIR);
 
-      if (isnil(obj)) {
-        ape_error(A, "index out of range");
-        return NULL;
-      }
-    }
-    return car(obj);
+  for (len = 0; !isnil(obj); obj = cdr(obj))
+    len += 1;
 
-  case APE_TSTRING: {
-    char ch = (char)string_ref(A, obj, idx);
-    return ape_lstring(A, &ch, 1);
-  }
+  return len;
+}
 
-  case APE_TVECTOR: {
-    int cnt = (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
-    ape_Object *place;
+int ape_strlen(ape_State *A, ape_Object obj) {
+  int len;
+  obj = ape_checktype(A, obj, APE_TSTRING);
 
-    if (idx >= cnt) {
-      ape_error(A, "index out of range");
-      return NULL;
-    }
+  for (len = 0; !isnil(obj); obj = cdr(obj))
+    len += strcnt(obj);
 
-    place = vector_place(cdr(obj), idx);
-    return place ? *place : nil;
-  }
+  return len;
+}
 
-  default:
-    ape_error(A, "not an iteratable object");
-    break;
-  }
-  return nil;
+int ape_veclen(ape_State *A, ape_Object obj) {
+  return (int)veclen(ape_checktype(A, obj, APE_TVECTOR));
 }
 
 long long ape_tointeger(ape_State *A, ape_Object obj) {
@@ -1176,7 +1122,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
   ape_Object v, res, *tail;
   decimal_t n;
-  int ch, top;
+  int ch;
   char buf[APE_SYMSIZE] = {0}, *p;
 
   /* get next character */
@@ -1204,8 +1150,6 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   case '(':
     res = nil;
     tail = &res;
-    top = ape_savegc(A);
-    ape_pushgc(A, res); /* to cause error on too-deep nesting */
 
     while ((v = reader(A, fn, udata)) != &rparen) {
       if (v == NULL) {
@@ -1221,8 +1165,6 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
         *tail = ape_cons(A, v, nil);
         tail = &cdr(*tail);
       }
-      ape_restoregc(A, top);
-      ape_pushgc(A, res);
     }
     return res;
 
@@ -1424,7 +1366,7 @@ void ape_write(ape_State *A, ape_Object obj, ape_WriteFunc fn, void *udata,
     len = (int)veclen(obj);
 
     for (i = 0; i < len; ++i) {
-      ape_write(A, ape_nth(A, obj, i), fn, udata, 1);
+      ape_write(A, ape_vecref(A, obj, i), fn, udata, 1);
 
       if (i < (len - 1))
         fn(A, udata, ' ');
@@ -1798,7 +1740,7 @@ ape_Object ape_eval(ape_State *A, ape_Object expr, ape_Object env) {
   ape_Object fn, args;
   ape_Cell cl;
   ape_Object res, va, vb; /* registers */
-  int gctop, argc, i;
+  int argc, i;
 
   env = env ? env : A->env;
 
@@ -1815,7 +1757,6 @@ EVAL:
 
     bound = car(*frame);
     /* Prevent local variables from being accidentally GC */
-    ape_pushgc(A, bound);
     return cdr(bound);
   }
 
@@ -1825,12 +1766,6 @@ EVAL:
   car(&cl) = expr;
   cdr(&cl) = A->calllist;
   A->calllist = &cl;
-
-  gctop = ape_savegc(A);
-
-  /* avoid accidental GC */
-  ape_pushgc(A, expr);
-  ape_pushgc(A, env);
 
   fn = ape_eval(A, car(expr), env);
   args = cdr(expr);
@@ -1853,7 +1788,6 @@ EVAL:
 
       expr = !isnil(va) ? vb : ape_nextarg(A, &args);
 
-      ape_restoregc(A, gctop);
       A->calllist = cdr(&cl);
       goto EVAL;
     case P_FN:
@@ -1899,7 +1833,6 @@ EVAL:
 
         expr = car(args);
 
-        ape_restoregc(A, gctop);
         A->calllist = cdr(&cl);
         goto EVAL;
       }
@@ -2001,13 +1934,11 @@ EVAL:
 
     expr = cdr(va); /* do block */
 
-    ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
     goto EVAL;
   case APE_TMACRO:
     expr = expand(A, fn, args);
 
-    ape_restoregc(A, gctop);
     A->calllist = cdr(&cl);
     goto EVAL;
   default:
@@ -2015,8 +1946,6 @@ EVAL:
     break;
   }
 
-  ape_restoregc(A, gctop);
-  ape_pushgc(A, res);
   A->calllist = cdr(&cl);
 
   return res;
@@ -2025,7 +1954,6 @@ EVAL:
 ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
   ape_Object expr;
   FILE *fp;
-  int gctop;
 
   fp = fopen(file, "rb");
 
@@ -2035,7 +1963,6 @@ ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
   }
 
   env = env ? env : A->env;
-  gctop = ape_savegc(A);
 
   for (;;) {
     expr = ape_readfp(A, fp);
@@ -2044,7 +1971,6 @@ ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
       break;
 
     ape_eval(A, expr, env);
-    ape_restoregc(A, gctop);
   }
 
   fclose(fp);

@@ -20,62 +20,9 @@ typedef struct Function {
   ape_CFunc func;
 } Function;
 
-static ape_Object istype(ape_State *A, ape_Object obj, int type) {
-  return ape_bool(A, ape_type(A, obj) == type);
-}
-
 static ape_Object nilp(ape_State *A, int argc, ape_Object args,
                        ape_Object env) {
   return ape_bool(A, ape_isnil(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object pairp(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TPAIR);
-}
-
-static ape_Object numberp(ape_State *A, int argc, ape_Object args,
-                          ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TNUMBER);
-}
-
-static ape_Object symbolp(ape_State *A, int argc, ape_Object args,
-                          ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TSYMBOL);
-}
-
-static ape_Object stringp(ape_State *A, int argc, ape_Object args,
-                          ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TSTRING);
-}
-
-static ape_Object vectorp(ape_State *A, int argc, ape_Object args,
-                          ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TVECTOR);
-}
-
-static ape_Object fnp(ape_State *A, int argc, ape_Object args, ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TFUNC);
-}
-
-static ape_Object macrop(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TMACRO);
-}
-
-static ape_Object primitivep(ape_State *A, int argc, ape_Object args,
-                             ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TPRIM);
-}
-
-static ape_Object cfnp(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TCFUNC);
-}
-
-static ape_Object ptrp(ape_State *A, int argc, ape_Object args,
-                       ape_Object env) {
-  return istype(A, ape_nextarg(A, &args), APE_TPTR);
 }
 
 static ape_Object print(ape_State *A, int argc, ape_Object args,
@@ -105,7 +52,7 @@ static ape_Object load(ape_State *A, int argc, ape_Object args,
 static ape_Object number(ape_State *A, int argc, ape_Object args,
                          ape_Object env) {
   ape_Object str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
-  int len = ape_length(A, str);
+  int len = ape_strlen(A, str);
   char *p, buf[APE_SYMSIZE] = {0};
   double n;
 
@@ -140,50 +87,36 @@ static ape_Object string(ape_State *A, int argc, ape_Object args,
   return ape_nil(A);
 }
 
-static ape_Object string_tolist(ape_State *A, int argc, ape_Object args,
+static ape_Object string_append(ape_State *A, int argc, ape_Object args,
+                         ape_Object env) {
+  return ape_strappend(A, args);
+}
+
+static ape_Object string_length(ape_State *A, int argc, ape_Object args,
                                 ape_Object env) {
-  ape_Object str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
-  ape_Object list = ape_nil(A);
-  int i = ape_length(A, str);
-  int gctop = ape_savegc(A);
-
-  while (i--) {
-    ape_restoregc(A, gctop);
-    list = ape_cons(A, ape_nth(A, str, i), list);
-  }
-  return list;
+  return ape_integer(A, ape_strlen(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object string_tovector(ape_State *A, int argc, ape_Object args,
-                                  ape_Object env) {
-  ape_Object str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
-  ape_Object vec = ape_vector(A, ape_length(A, str));
-  int i;
-
-  for (i = 0; i < ape_length(A, vec); ++i)
-    ape_vecset(A, vec, i, ape_nth(A, str, i));
-
-  return vec;
+static ape_Object vector_length(ape_State *A, int argc, ape_Object args,
+                                ape_Object env) {
+  return ape_integer(A, ape_veclen(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object concat(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_concat(A, args);
-}
-
-static ape_Object length(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
-  return ape_integer(A, ape_length(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object reverse(ape_State *A, int argc, ape_Object args,
-                          ape_Object env) {
-  return ape_reverse(A, ape_nextarg(A, &args));
-}
-
-static ape_Object nth(ape_State *A, int argc, ape_Object args, ape_Object env) {
+static ape_Object string_ref(ape_State *A, int argc, ape_Object args,
+                             ape_Object env) {
   int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
-  return ape_nth(A, ape_nextarg(A, &args), index);
+  return ape_strref(A, ape_nextarg(A, &args), index);
+}
+
+static ape_Object vector_ref(ape_State *A, int argc, ape_Object args,
+                             ape_Object env) {
+  int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
+  return ape_vecref(A, ape_nextarg(A, &args), index);
+}
+
+static ape_Object string_reverse(ape_State *A, int argc, ape_Object args,
+                          ape_Object env) {
+  return ape_strreverse(A, ape_nextarg(A, &args));
 }
 
 static ape_Object assoc(ape_State *A, int argc, ape_Object args,
@@ -219,7 +152,7 @@ static ape_Object symbol(ape_State *A, int argc, ape_Object args,
   ape_Object str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
   char buf[APE_SYMSIZE] = {0};
 
-  if (ape_length(A, str) >= APE_SYMSIZE)
+  if (ape_strlen(A, str) >= APE_SYMSIZE)
     ape_error(A, "symbol too long");
 
   ape_tostring(A, str, buf, sizeof(buf) - 1);
@@ -234,32 +167,6 @@ static ape_Object gensym(ape_State *A, int argc, ape_Object args,
 static ape_Object make_vector(ape_State *A, int argc, ape_Object args,
                               ape_Object env) {
   return ape_vector(A, (int)ape_tointeger(A, ape_nextarg(A, &args)));
-}
-
-static ape_Object vector_tolist(ape_State *A, int argc, ape_Object args,
-                                ape_Object env) {
-  ape_Object vec = ape_checktype(A, ape_nextarg(A, &args), APE_TVECTOR);
-  ape_Object list = ape_nil(A);
-  int i = ape_length(A, vec);
-  int gctop = ape_savegc(A);
-
-  while (i--) {
-    ape_restoregc(A, gctop);
-    list = ape_cons(A, ape_nth(A, vec, i), list);
-  }
-  return list;
-}
-
-static ape_Object list_tovector(ape_State *A, int argc, ape_Object args,
-                                ape_Object env) {
-  ape_Object list = ape_checktype(A, ape_nextarg(A, &args), APE_TPAIR);
-  ape_Object vec = ape_vector(A, ape_length(A, list));
-  int i;
-
-  for (i = 0; i < ape_length(A, vec); ++i)
-    ape_vecset(A, vec, i, ape_nextarg(A, &list));
-
-  return vec;
 }
 
 static ape_Object rem(ape_State *A, int argc, ape_Object args, ape_Object env) {
@@ -537,6 +444,62 @@ static const char cddddr[] = {"                                                \
 (defn cddddr (list)                                                            \
   (cdr (cdddr list)))"};
 
+static const char pairp[] = {"                                                 \
+(defn pair? (p)                                                                \
+  (= (type p) 'pair))"};
+
+static const char numberp[] = {"                                               \
+(defn number? (n)                                                              \
+  (= (type n) 'number))"};
+
+static const char symbolp[] = {"                                               \
+(defn symbol? (s)                                                              \
+  (= (type s) 'symbol))"};
+
+static const char stringp[] = {"                                               \
+(defn string? (s)                                                              \
+  (= (type s) 'string))"};
+
+static const char vectorp[] = {"                                               \
+(defn vector? (v)                                                              \
+  (= (type v) 'vector))"};
+
+static const char fnp[] = {"                                                   \
+(defn fn? (f)                                                                  \
+  (= (type f) 'function))"};
+
+static const char macrop[] = {"                                                \
+(defn macro? (m)                                                               \
+  (= (type m) 'macro))"};
+
+static const char primitivep[] = {"                                            \
+(defn primitive? (p)                                                           \
+  (= (type p) 'primitive))"};
+
+static const char cfnp[] = {"                                                  \
+(defn cfn? (f)                                                                 \
+  (= (type f) 'cfunction))"};
+
+static const char ptrp[] = {"                                                  \
+(defn ptr? (p)                                                                 \
+  (= (type p) 'pointer))"};
+
+static const char length[] = {"                                                \
+(defn length (list)                                                            \
+  (def cnt 0)                                                                  \
+  (while list                                                                  \
+    (set! list (cdr list))                                                     \
+    (set! cnt (+ cnt 1)))                                                      \
+  cnt)"};
+
+static const char reverse[] = {"                                               \
+(defn reverse (list)                                                           \
+  (def res nil)                                                                \
+  (while list                                                                  \
+    (set! res (cons (car list) res))                                           \
+    (set! list (cdr list)))                                                    \
+  res)"};
+
 static const char let[] = {"                                                   \
 (defmacro let (binds . body)                                                   \
   ((fn ()                                                                      \
@@ -632,37 +595,66 @@ static const char pop[] = {"                                                   \
        (set! ,place (cdr ,place))                                              \
        ,gx)))"};
 
+static const char string_tolist[] = {"                                         \
+(defn string->list (string)                                                    \
+  (def i 0)                                                                    \
+  (def len (string-length string))                                             \
+  (def res nil)                                                                \
+  (while (< i len)                                                             \
+    (set! res (cons (string-ref i string) res))                                \
+    (set! i (+ i 1)))                                                          \
+  (reverse res))"};
+
+static const char string_tovector[] = {"                                       \
+(defn string->vector (string)                                                  \
+  (def i 0)                                                                    \
+  (def len (string-length string))                                             \
+  (def res (make-vector len))                                                  \
+  (while (< i len)                                                             \
+    (vector-set! res i (string-ref i string))                                  \
+    (set! i (+ i 1)))                                                          \
+  res)"};
+
+static const char vector_tolist[] = {"                                         \
+(defn vector->list (vector)                                                    \
+  (def i 0)                                                                    \
+  (def len (vector-length vector))                                             \
+  (def res nil)                                                                \
+  (while (< i len)                                                             \
+    (set! res (cons (vector-ref i vector) res))                                \
+    (set! i (+ i 1)))                                                          \
+  (reverse res))"};
+
+static const char list_tovector[] = {"                                         \
+(defn list->vector (list)                                                      \
+  (def i 0)                                                                    \
+  (def len (length list))                                                      \
+  (def res (make-vector len))                                                  \
+  (while list                                                                  \
+    (vector-set! res i (car list))                                             \
+    (set! list (cdr list))                                                     \
+    (set! i (+ i 1)))                                                          \
+  res)"};
+
 void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
       {"nil?", nilp},
-      {"pair?", pairp},
-      {"number?", numberp},
-      {"symbol?", symbolp},
-      {"string?", stringp},
-      {"vector?", vectorp},
-      {"fn?", fnp},
-      {"macro?", macrop},
-      {"primitive?", primitivep},
-      {"cfn?", cfnp},
-      {"ptr?", ptrp},
       {"print", print},
       {"eval", eval},
       {"load", load},
       {"number", number},
       {"string", string},
-      {"string->list", string_tolist},
-      {"string->vector", string_tovector},
-      {"concat", concat},
-      {"length", length},
-      {"reverse", reverse},
-      {"nth", nth},
+      {"string-append", string_append},
+      {"string-length", string_length},
+      {"vector-length", vector_length},
+      {"string-ref", string_ref},
+      {"vector-ref", vector_ref},
+      {"string-reverse", string_reverse},
       {"assoc", assoc},
       {"get", get},
       {"symbol", symbol},
       {"gensym", gensym},
       {"make-vector", make_vector},
-      {"vector->list", vector_tolist},
-      {"list->vector", list_tovector},
       {"rem", rem},
       {"round", round_},
       {"nan?", nanp},
@@ -692,25 +684,77 @@ void stdlib_open(ape_State *A) {
       {NULL, NULL},
   };
   const char *stdlib[] = {
-      list,   defmacro, defn,   caar,   cadr,   cdar,   cddr,   caaar,
-      caadr,  cadar,    caddr,  cdaar,  cdadr,  cddar,  cdddr,  caaaar,
-      caaadr, caadar,   caaddr, cadaar, cadadr, caddar, cadddr, cdaaar,
-      cdaadr, cdadar,   cdaddr, cddaar, cddadr, cdddar, cddddr, let,
-      cond,   apply,    when,   unless, while_, for_,   append, map,
-      filter, reduce,   acons,  push,   pop,    NULL,
+      list,
+      defmacro,
+      defn,
+      caar,
+      cadr,
+      cdar,
+      cddr,
+      caaar,
+      caadr,
+      cadar,
+      caddr,
+      cdaar,
+      cdadr,
+      cddar,
+      cdddr,
+      caaaar,
+      caaadr,
+      caadar,
+      caaddr,
+      cadaar,
+      cadadr,
+      caddar,
+      cadddr,
+      cdaaar,
+      cdaadr,
+      cdadar,
+      cdaddr,
+      cddaar,
+      cddadr,
+      cdddar,
+      cddddr,
+      pairp,
+      numberp,
+      symbolp,
+      stringp,
+      vectorp,
+      fnp,
+      macrop,
+      primitivep,
+      cfnp,
+      ptrp,
+      length,
+      reverse,
+      let,
+      cond,
+      apply,
+      when,
+      unless,
+      while_,
+      for_,
+      append,
+      map,
+      filter,
+      reduce,
+      acons,
+      push,
+      pop,
+      string_tolist,
+      string_tovector,
+      vector_tolist,
+      list_tovector,
+      NULL,
   };
-  int gctop = ape_savegc(A);
 
   /* c libs */
-  for (const Function *func = cfuncs; func->name && func->func; ++func) {
+  for (const Function *func = cfuncs; func->name && func->func; ++func)
     ape_def(A, ape_symbol(A, func->name), ape_cfunc(A, func->func), NULL);
-    ape_restoregc(A, gctop);
-  }
 
   /* ape libs */
   for (const char **lib = stdlib; *lib; ++lib) {
     ape_Object expr = ape_readstring(A, *lib);
     ape_eval(A, expr, NULL);
-    ape_restoregc(A, gctop);
   }
 }

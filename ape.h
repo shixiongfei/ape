@@ -76,13 +76,8 @@ APE_API void ape_close(ape_State *A);
 APE_API ape_Handlers *ape_handlers(ape_State *A);
 APE_API int ape_error(ape_State *A, const char *format, ...);
 
-APE_API void ape_pushgc(ape_State *A, ape_Object obj);
-APE_API void ape_restoregc(ape_State *A, int idx);
-APE_API int ape_savegc(ape_State *A);
-
-APE_API int ape_length(ape_State *A, ape_Object obj);
-APE_API int ape_isnil(ape_State *A, ape_Object obj);
 APE_API int ape_type(ape_State *A, ape_Object obj);
+APE_API int ape_isnil(ape_State *A, ape_Object obj);
 APE_API int ape_equal(ape_State *A, ape_Object a, ape_Object b);
 
 APE_API ape_Object ape_checktype(ape_State *A, ape_Object obj, int type);
@@ -98,7 +93,6 @@ APE_API ape_Object ape_integer(ape_State *A, long long n);
 APE_API ape_Object ape_number(ape_State *A, double n);
 APE_API ape_Object ape_string(ape_State *A, const char *str);
 APE_API ape_Object ape_lstring(ape_State *A, const char *str, int len);
-APE_API ape_Object ape_concat(ape_State *A, ape_Object objs);
 APE_API ape_Object ape_symbol(ape_State *A, const char *name);
 APE_API ape_Object ape_vector(ape_State *A, int len);
 APE_API ape_Object ape_vecset(ape_State *A, ape_Object vec, int pos,
@@ -106,8 +100,13 @@ APE_API ape_Object ape_vecset(ape_State *A, ape_Object vec, int pos,
 APE_API ape_Object ape_cfunc(ape_State *A, ape_CFunc fn);
 APE_API ape_Object ape_ptr(ape_State *A, void *ptr, int subtype);
 APE_API ape_Object ape_gensym(ape_State *A);
-APE_API ape_Object ape_reverse(ape_State *A, ape_Object obj);
-APE_API ape_Object ape_nth(ape_State *A, ape_Object obj, int idx);
+APE_API ape_Object ape_strref(ape_State *A, ape_Object obj, int idx);
+APE_API ape_Object ape_vecref(ape_State *A, ape_Object obj, int idx);
+APE_API ape_Object ape_strappend(ape_State *A, ape_Object objs);
+APE_API ape_Object ape_strreverse(ape_State *A, ape_Object obj);
+
+APE_API int ape_strlen(ape_State *A, ape_Object obj);
+APE_API int ape_veclen(ape_State *A, ape_Object obj);
 
 APE_API long long ape_tointeger(ape_State *A, ape_Object obj);
 APE_API double ape_tonumber(ape_State *A, ape_Object obj);
