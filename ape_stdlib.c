@@ -127,34 +127,6 @@ static ape_Object string_reverse(ape_State *A, int argc, ape_Object args,
   return ape_strreverse(A, ape_nextarg(A, &args));
 }
 
-static ape_Object assoc(ape_State *A, int argc, ape_Object args,
-                        ape_Object env) {
-  ape_Object k = ape_nextarg(A, &args);
-  ape_Object l = ape_checktype(A, ape_nextarg(A, &args), APE_TPAIR);
-  ape_Object p;
-
-  for (; !ape_isnil(A, l); l = ape_cdr(A, l)) {
-    p = ape_car(A, l);
-
-    if (ape_equal(A, k, ape_car(A, p)))
-      return p;
-  }
-  return ape_nil(A);
-}
-
-static ape_Object get(ape_State *A, int argc, ape_Object args, ape_Object env) {
-  ape_Object l = ape_checktype(A, ape_nextarg(A, &args), APE_TPAIR);
-  ape_Object k = ape_nextarg(A, &args);
-
-  while (!ape_isnil(A, l)) {
-    if (ape_equal(A, k, ape_car(A, l)))
-      return ape_car(A, ape_cdr(A, l));
-
-    l = ape_cdr(A, ape_cdr(A, l));
-  }
-  return !ape_isnil(A, args) ? ape_nextarg(A, &args) : ape_nil(A);
-}
-
 static ape_Object symbol(ape_State *A, int argc, ape_Object args,
                          ape_Object env) {
   ape_Object str = ape_checktype(A, ape_nextarg(A, &args), APE_TSTRING);
@@ -592,6 +564,21 @@ static const char acons[] = {"                                                 \
 (defn acons (a b l)                                                            \
   (cons (cons a b) l))"};
 
+static const char assoc[] = {"                                                 \
+(defn assoc (key list)                                                         \
+  (let (p (car list))                                                          \
+    (cond                                                                      \
+      (not list) nil                                                           \
+      (= (car p) key) p                                                        \
+      (assoc key (cdr list)))))"};
+
+static const char get[] = {"                                                   \
+(defn get (list key (default nil))                                             \
+  (cond                                                                        \
+    (not list) default                                                         \
+    (= (car list) key) (cadr list)                                             \
+    (get (cddr list) key default)))"};
+
 static const char push[] = {"                                                  \
 (defmacro push (val place)                                                     \
   `(set! ,place (cons ,val ,place)))"};
@@ -668,8 +655,6 @@ void stdlib_open(ape_State *A) {
       {"string-ref", string_ref},
       {"vector-ref", vector_ref},
       {"string-reverse", string_reverse},
-      {"assoc", assoc},
-      {"get", get},
       {"symbol", symbol},
       {"gensym", gensym},
       {"make-vector", make_vector},
@@ -702,19 +687,39 @@ void stdlib_open(ape_State *A) {
       {NULL, NULL},
   };
   const char *stdlib[] = {
-      list,          defmacro,      defn,     caar,          cadr,
-      cdar,          cddr,          caaar,    caadr,         cadar,
-      caddr,         cdaar,         cdadr,    cddar,         cdddr,
-      caaaar,        caaadr,        caadar,   caaddr,        cadaar,
-      cadadr,        caddar,        cadddr,   cdaaar,        cdaadr,
-      cdadar,        cdaddr,        cddaar,   cddadr,        cdddar,
-      cddddr,        pairp,         numberp,  symbolp,       stringp,
-      vectorp,       fnp,           macrop,   primitivep,    cfnp,
-      ptrp,          length,        reverse,  let,           cond,
-      apply,         when,          unless,   while_,        for_,
-      append,        map,           filter,   reduce,        acons,
-      push,          pop,           list_ref, string_tolist, string_tovector,
-      vector_tolist, list_tovector, NULL,
+      list,          defmacro,
+      defn,          caar,
+      cadr,          cdar,
+      cddr,          caaar,
+      caadr,         cadar,
+      caddr,         cdaar,
+      cdadr,         cddar,
+      cdddr,         caaaar,
+      caaadr,        caadar,
+      caaddr,        cadaar,
+      cadadr,        caddar,
+      cadddr,        cdaaar,
+      cdaadr,        cdadar,
+      cdaddr,        cddaar,
+      cddadr,        cdddar,
+      cddddr,        pairp,
+      numberp,       symbolp,
+      stringp,       vectorp,
+      fnp,           macrop,
+      primitivep,    cfnp,
+      ptrp,          length,
+      reverse,       let,
+      cond,          apply,
+      when,          unless,
+      while_,        for_,
+      append,        map,
+      filter,        reduce,
+      acons,         assoc,
+      get,           push,
+      pop,           list_ref,
+      string_tolist, string_tovector,
+      vector_tolist, list_tovector,
+      NULL,
   };
 
   /* c libs */
