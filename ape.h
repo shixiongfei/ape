@@ -18,6 +18,9 @@
 #define APE_MINOR 3
 #define APE_PATCH 0
 
+#define APE__PASTE(name, id) name##id
+#define APE_PASTE(name, id) APE__PASTE(name, id)
+
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
 
@@ -34,12 +37,114 @@
 
 #define APE_SYMSIZE 64
 
+#define APE_GCROOTEND ((void *)-1)
+#define APE_GCUNIQUE(name) APE_PASTE(name, __LINE__)
+
+#define APE_GCDEFROOTS(A, size)                                                \
+  ape_Object APE_GCUNIQUE(roots_)[size + 2] = {NULL};                          \
+  ape_State APE_GCUNIQUE(state_) = {A->ctx, APE_GCUNIQUE(roots_)}
+
+#define APE_GCDEFVAR(var, idx)                                                 \
+  ape_Object *var = (ape_Object *)(APE_GCUNIQUE(roots_) + idx);
+
+#define APE_GCROOTS(A, size)                                                   \
+  APE_GCUNIQUE(roots_)[0] = (ape_Object)A->roots;                              \
+  APE_GCUNIQUE(roots_)[size + 1] = APE_GCROOTEND;                              \
+  A = &APE_GCUNIQUE(state_)
+
+#define ape_defvar1(A, var1)                                                   \
+  APE_GCDEFROOTS(A, 1);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCROOTS(A, 1)
+
+#define ape_defvar2(A, var1, var2)                                             \
+  APE_GCDEFROOTS(A, 2);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCROOTS(A, 2)
+
+#define ape_defvar3(A, var1, var2, var3)                                       \
+  APE_GCDEFROOTS(A, 3);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCROOTS(A, 3)
+
+#define ape_defvar4(A, var1, var2, var3, var4)                                 \
+  APE_GCDEFROOTS(A, 4);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCDEFVAR(var4, 4);                                                       \
+  APE_GCROOTS(A, 4)
+
+#define ape_defvar5(A, var1, var2, var3, var4, var5)                           \
+  APE_GCDEFROOTS(A, 5);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCDEFVAR(var4, 4);                                                       \
+  APE_GCDEFVAR(var5, 5);                                                       \
+  APE_GCROOTS(A, 5)
+
+#define ape_defvar6(A, var1, var2, var3, var4, var5, var6)                     \
+  APE_GCDEFROOTS(A, 6);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCDEFVAR(var4, 4);                                                       \
+  APE_GCDEFVAR(var5, 5);                                                       \
+  APE_GCDEFVAR(var6, 6);                                                       \
+  APE_GCROOTS(A, 6)
+
+#define ape_defvar7(A, var1, var2, var3, var4, var5, var6, var7)               \
+  APE_GCDEFROOTS(A, 7);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCDEFVAR(var4, 4);                                                       \
+  APE_GCDEFVAR(var5, 5);                                                       \
+  APE_GCDEFVAR(var6, 6);                                                       \
+  APE_GCDEFVAR(var7, 7);                                                       \
+  APE_GCROOTS(A, 7)
+
+#define ape_defvar8(A, var1, var2, var3, var4, var5, var6, var7, var8)         \
+  APE_GCDEFROOTS(A, 8);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCDEFVAR(var4, 4);                                                       \
+  APE_GCDEFVAR(var5, 5);                                                       \
+  APE_GCDEFVAR(var6, 6);                                                       \
+  APE_GCDEFVAR(var7, 7);                                                       \
+  APE_GCDEFVAR(var8, 8);                                                       \
+  APE_GCROOTS(A, 8)
+
+#define ape_defvar9(A, var1, var2, var3, var4, var5, var6, var7, var8, var9)   \
+  APE_GCDEFROOTS(A, 9);                                                        \
+  APE_GCDEFVAR(var1, 1);                                                       \
+  APE_GCDEFVAR(var2, 2);                                                       \
+  APE_GCDEFVAR(var3, 3);                                                       \
+  APE_GCDEFVAR(var4, 4);                                                       \
+  APE_GCDEFVAR(var5, 5);                                                       \
+  APE_GCDEFVAR(var6, 6);                                                       \
+  APE_GCDEFVAR(var7, 7);                                                       \
+  APE_GCDEFVAR(var8, 8);                                                       \
+  APE_GCDEFVAR(var9, 9);                                                       \
+  APE_GCROOTS(A, 9)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct ape_Cell ape_Cell, *ape_Object;
-typedef struct ape_State ape_State;
+typedef struct ape_Context ape_Context;
+
+typedef struct ape_State {
+  ape_Context *ctx;
+  ape_Object *roots;
+} ape_State;
+
 typedef ape_Object (*ape_CFunc)(ape_State *A, int argc, ape_Object args,
                                 ape_Object env);
 typedef void (*ape_GCFunc)(ape_State *A, void *ptr, int subtype);
@@ -86,8 +191,8 @@ APE_API ape_Object ape_car(ape_State *A, ape_Object obj);
 APE_API ape_Object ape_cdr(ape_State *A, ape_Object obj);
 APE_API ape_Object ape_setcar(ape_State *A, ape_Object obj, ape_Object car);
 APE_API ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr);
-APE_API ape_Object ape_true(ape_State *A);
 APE_API ape_Object ape_nil(ape_State *A);
+APE_API ape_Object ape_true(ape_State *A);
 APE_API ape_Object ape_bool(ape_State *A, int b);
 APE_API ape_Object ape_integer(ape_State *A, long long n);
 APE_API ape_Object ape_number(ape_State *A, double n);
@@ -100,10 +205,11 @@ APE_API ape_Object ape_vecset(ape_State *A, ape_Object vec, int pos,
 APE_API ape_Object ape_cfunc(ape_State *A, ape_CFunc fn);
 APE_API ape_Object ape_ptr(ape_State *A, void *ptr, int subtype);
 APE_API ape_Object ape_gensym(ape_State *A);
-APE_API ape_Object ape_strref(ape_State *A, ape_Object obj, int idx);
-APE_API ape_Object ape_vecref(ape_State *A, ape_Object obj, int idx);
 APE_API ape_Object ape_strappend(ape_State *A, ape_Object objs);
 APE_API ape_Object ape_strreverse(ape_State *A, ape_Object obj);
+
+APE_API ape_Object ape_vecref(ape_State *A, ape_Object obj, int idx);
+APE_API int ape_strref(ape_State *A, ape_Object obj, int idx);
 
 APE_API int ape_strlen(ape_State *A, ape_Object obj);
 APE_API int ape_veclen(ape_State *A, ape_Object obj);

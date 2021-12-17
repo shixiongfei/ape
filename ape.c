@@ -96,8 +96,7 @@ typedef uintptr_t uword_t;
 #define FCMARKBIT (1 << 2) /* Full Chars */
 #define HASHMASK ((1 << 16) - 1)
 #define PTRTYPEMASK 0xFFFF
-#define SEMISIZE (0x8000)
-#define GCSTACKSIZE (0x100)
+#define SEMISIZE (0x1000)
 
 typedef union {
   ape_Cell *o;
@@ -146,15 +145,9 @@ struct ape_Cell {
 };
 
 typedef struct {
-  int size, top;
-  ape_Cell **base;
-} Stack;
-
-typedef struct {
   uword_t semi_size;   /* semi space size */
   ape_Cell *to, *from; /* semi space differentiation */
   ape_Cell *head;      /* current head of free memory */
-  Stack stack;         /* GC stack */
 } GC;
 
 /*                        Symbol List
@@ -171,7 +164,9 @@ typedef struct {
  *     +--------+--------+        +--------+--------+
  */
 
-struct ape_State {
+struct ape_Context {
+  ape_State state;
+
   ape_Alloc alloc;
   void *ud;
 
@@ -263,6 +258,8 @@ struct ape_State {
 #define stridx(x) (strbuf(x)[STRBUFINDEX])
 #define strcnt(x) (tag(x) & FCMARKBIT ? STRBUFSIZE : stridx(x))
 
+#define CTX(A) (A->ctx)
+
 static ape_Cell nilc = {{(ape_Cell *)(APE_TNIL << 3 | 1)}, {NULL}};
 static ape_Cell *nil = &nilc;
 
@@ -276,7 +273,7 @@ static void *alloc_emul(void *ud, void *ptr, size_t size) {
   return NULL;
 }
 
-#define ape_realloc(A, p, n) A->alloc(A->ud, p, n)
+#define ape_realloc(A, p, n) CTX(A)->alloc(CTX(A)->ud, p, n)
 #define ape_malloc(A, n) ape_realloc(A, NULL, n)
 #define ape_free(A, p) ape_realloc(A, p, 0)
 
@@ -290,132 +287,15 @@ static void *ape_calloc(ape_State *A, size_t n, size_t s) {
   return p;
 }
 
-static int stack_create(ape_State *A, Stack *stack, int size) {
-  stack->base = (ape_Cell **)ape_malloc(A, size * sizeof(ape_Cell *));
-
-  if (!stack->base)
-    return -1;
-
-  stack->base;
-  stack->size = size;
-  stack->top = 0;
-
-  return 0;
-}
-
-static void stack_destroy(ape_State *A, Stack *stack) {
-  if (stack->base) {
-    ape_free(A, stack->base);
-    stack->base = NULL;
-  }
-
-  stack->top = stack->size = 0;
-}
-
-static int stack_gettop(Stack *stack) { return stack->top; }
-
-static void stack_settop(Stack *stack, int top) { stack->top = top; }
-
-static Stack *stack_extendifneed(ape_State *A, Stack *stack) {
-  ape_Cell **base;
-  int size;
-
-  if (stack->top < stack->size)
-    return stack;
-
-  if (stack->size > (INT_MAX >> 1))
-    return NULL;
-
-  size = stack->size << 1;
-  base = (ape_Cell **)ape_realloc(A, stack->base, size * sizeof(ape_Cell *));
-
-  if (!base)
-    return NULL;
-
-  stack->base = base;
-  stack->size = size;
-
-  return stack;
-}
-
-static ape_Object stack_push(ape_State *A, Stack *stack, ape_Cell *cell) {
-  stack = stack_extendifneed(A, stack);
-
-  if (!stack) {
-    ape_error(A, "stack overflow");
-    return NULL;
-  }
-
-  stack->base[stack->top] = cell;
-  return stack->base[stack->top++];
-}
-
-static ape_Cell *stack_pop(ape_State *A, Stack *stack) {
-  if (stack->top == 0) {
-    ape_error(A, "stack underflow");
-    return NULL;
-  }
-  return stack->base[--stack->top];
-}
-
-static int gc_create(ape_State *A, int stack_size) {
-  GC *gc = &A->gc;
-
-  /* semi space */
-  gc->semi_size = SEMISIZE;
-  gc->to = (ape_Cell *)ape_calloc(A, gc->semi_size, sizeof(ape_Cell));
-
-  if (!gc->to)
-    return -1;
-
-  gc->from = (ape_Cell *)ape_calloc(A, gc->semi_size, sizeof(ape_Cell));
-
-  if (!gc->from)
-    return -1;
-
-  gc->head = gc->from;
-
-  return stack_create(A, &gc->stack, stack_size);
-}
-
-static void gc_destroy(ape_State *A) {
-  GC *gc = &A->gc;
-
-  stack_destroy(A, &gc->stack);
-
-  if (gc->to) {
-    ape_free(A, gc->to);
-    gc->to = NULL;
-  }
-
-  if (gc->from) {
-    ape_free(A, gc->from);
-    gc->from = NULL;
-  }
-
-  gc->head = NULL;
-  gc->semi_size = 0;
-}
-
-ape_Object gc_push(ape_State *A, ape_Cell *cell) {
-  GC *gc = &A->gc;
-  return stack_push(A, &gc->stack, cell);
-}
-
-ape_Cell *gc_pop(ape_State *A) {
-  GC *gc = &A->gc;
-  return stack_pop(A, &gc->stack);
-}
-
 static ape_Cell *handle_gc(ape_State *A, ape_Cell *cell) {
   /* GC the previous C pointer */
-  if (type(cell) == APE_TPTR && A->handlers.gc)
-    A->handlers.gc(A, cdr(cell), (int)ptrtype(cell));
+  if (type(cell) == APE_TPTR && CTX(A)->handlers.gc)
+    CTX(A)->handlers.gc(A, cdr(cell), (int)ptrtype(cell));
   return cell;
 }
 
 static void copy_ref(ape_State *A, ape_Cell **p) {
-  GC *gc = &A->gc;
+  GC *gc = &CTX(A)->gc;
   ape_Cell *cell = *p;
   ape_Cell *dst;
 
@@ -445,29 +325,42 @@ static void copy_ref(ape_State *A, ape_Cell **p) {
   *p = dst;
 }
 
+static void copy_roots(ape_State *A, ape_Cell **roots) {
+  int i;
+
+  if (roots[0])
+    copy_roots(A, (ape_Cell **)roots[0]);
+
+  for (i = 1; roots[i] != APE_GCROOTEND; ++i)
+    if (roots[i])
+      copy_ref(A, &roots[i]);
+}
+
 static void copy_heap(ape_State *A) {
-  GC *gc = &A->gc;
+  GC *gc = &CTX(A)->gc;
   ape_Cell *scan;
   int i;
 
-  /* copy the GC stack */
-  for (i = 0; i < gc->stack.top; ++i)
-    copy_ref(A, gc->stack.base + i);
-
   /* copy the symbol list */
-  copy_ref(A, &A->symlist);
-  copy_ref(A, &A->t);
+  copy_ref(A, &CTX(A)->symlist);
+  copy_ref(A, &CTX(A)->t);
 
   /* copy the environment */
-  copy_ref(A, &A->env);
+  copy_ref(A, &CTX(A)->env);
+
+  /* copy the call list */
+  copy_ref(A, &CTX(A)->calllist);
 
   /* copy the primitive symbols */
   for (i = 0; i < P_MAX; ++i)
-    copy_ref(A, &A->primsyms[i]);
+    copy_ref(A, &CTX(A)->primsyms[i]);
 
   /* copy the type name symbols */
   for (i = 0; i < APE_TMAX; ++i)
-    copy_ref(A, &A->typesyms[i]);
+    copy_ref(A, &CTX(A)->typesyms[i]);
+
+  /* copy the roots */
+  copy_roots(A, A->roots);
 
   /* scan until reaching the head */
   for (scan = gc->from; scan != gc->head; ++scan) {
@@ -482,8 +375,6 @@ static void copy_heap(ape_State *A) {
       copy_ref(A, &cdr(scan));
       break;
     case APE_TVECTOR:
-      copy_ref(A, &cdr(scan));
-
       for (i = 0; i < (int)((veclen(scan) >> 1) + (veclen(scan) & 1)); ++i)
         copy_ref(A, &cdr(scan) + i);
       break;
@@ -492,7 +383,7 @@ static void copy_heap(ape_State *A) {
 }
 
 static double collect_garbage(ape_State *A) {
-  GC *gc = &A->gc;
+  GC *gc = &CTX(A)->gc;
   ape_Cell *swap;
 
   /* swap semi spaces */
@@ -521,7 +412,7 @@ static void free_heap(ape_State *A, ape_Cell *heap, uword_t heap_size) {
 }
 
 static int rescale_heap(ape_State *A, int grow_size) {
-  GC *gc = &A->gc;
+  GC *gc = &CTX(A)->gc;
   ape_Cell *from, *to;
   uword_t allocated, semi_size, heap_size;
 
@@ -551,7 +442,6 @@ static int rescale_heap(ape_State *A, int grow_size) {
     return -1;
   }
 
-  gc->from = from;
   gc->head = gc->from;
   gc->semi_size = semi_size;
 
@@ -563,7 +453,7 @@ static int rescale_heap(ape_State *A, int grow_size) {
 }
 
 static ape_Cell *halloc(ape_State *A, int n) {
-  GC *gc = &A->gc;
+  GC *gc = &CTX(A)->gc;
   ape_Cell *cells;
 
   if (gc->head + n > gc->from + gc->semi_size) {
@@ -593,9 +483,7 @@ static ape_Cell *halloc(ape_State *A, int n) {
   return cells;
 }
 
-static ape_Object create_object(ape_State *A) {
-  return gc_push(A, halloc(A, 1));
-}
+#define create_object(A) halloc(A, 1)
 
 /*                            Environment
  *           +--------+--------+     +--------+--------+
@@ -615,63 +503,107 @@ static ape_Object create_env(ape_State *A, ape_Object parent) {
   return ape_cons(A, nil, parent);
 }
 
+static int gc_create(ape_State *A) {
+  GC *gc = &CTX(A)->gc;
+
+  /* semi space */
+  gc->semi_size = SEMISIZE;
+  gc->to = (ape_Cell *)ape_calloc(A, gc->semi_size, sizeof(ape_Cell));
+
+  if (!gc->to)
+    return -1;
+
+  gc->from = (ape_Cell *)ape_calloc(A, gc->semi_size, sizeof(ape_Cell));
+
+  if (!gc->from)
+    return -1;
+
+  gc->head = gc->from;
+
+  return 0;
+}
+
+static void gc_destroy(ape_State *A) {
+  GC *gc = &CTX(A)->gc;
+
+  if (gc->to) {
+    ape_free(A, gc->to);
+    gc->to = NULL;
+  }
+
+  if (gc->from) {
+    ape_free(A, gc->from);
+    gc->from = NULL;
+  }
+
+  gc->head = NULL;
+  gc->semi_size = 0;
+}
+
 extern void stdlib_open(ape_State *A);
 
 static ape_State *ape_init(ape_State *A) {
   int i;
 
+  ape_defvar1(A, v);
+
   /* init lists */
-  A->calllist = nil;
-  A->symlist = nil;
+  CTX(A)->calllist = nil;
+  CTX(A)->symlist = nil;
 
   /* global environment */
-  A->env = create_env(A, nil);
+  CTX(A)->env = create_env(A, nil);
 
   /* init symbol id */
-  A->symid = (unsigned int)((uintptr_t)A >> 16); /* random seed */
-  A->symid = ((A->symid * 214013L + 2531011L) >> 16) & 0x01ff;
+  CTX(A)->symid = (unsigned int)((uintptr_t)A >> 16); /* random seed */
+  CTX(A)->symid = ((CTX(A)->symid * 214013L + 2531011L) >> 16) & 0x01ff;
 
   /* init objects */
-  A->t = ape_symbol(A, "true");
-  ape_def(A, A->t, A->t, NULL);
+  CTX(A)->t = ape_symbol(A, "true");
+  ape_def(A, CTX(A)->t, CTX(A)->t, NULL);
 
   /* init primitive symbols */
   for (i = 0; i < P_MAX; ++i)
-    A->primsyms[i] = ape_symbol(A, primnames[i]);
+    CTX(A)->primsyms[i] = ape_symbol(A, primnames[i]);
 
   /* init type name symbols */
   for (i = 0; i < APE_TMAX; ++i)
-    A->typesyms[i] = ape_symbol(A, typenames[i]);
+    CTX(A)->typesyms[i] = ape_symbol(A, typenames[i]);
 
   /* register built in primitives */
   for (i = 0; i < P_MAX; ++i) {
-    ape_Object v = create_object(A);
+    *v = create_object(A);
 
-    settype(v, APE_TPRIM);
-    prim(v) = i;
+    settype(*v, APE_TPRIM);
+    prim(*v) = i;
 
-    ape_def(A, A->primsyms[i], v, NULL);
+    ape_def(A, CTX(A)->primsyms[i], *v, NULL);
   }
 
   stdlib_open(A);
-  return A;
+  return &CTX(A)->state;
 }
 
 ape_State *ape_newstate(ape_Alloc f, void *ud) {
   ape_Alloc alloc = f ? f : alloc_emul;
-  ape_State *A = (ape_State *)alloc(ud, NULL, sizeof(ape_State));
+  ape_Context *ctx = (ape_Context *)alloc(ud, NULL, sizeof(ape_Context));
+  ape_State *A;
 
-  if (!A)
+  if (!ctx)
     return NULL;
 
-  memset(A, 0, sizeof(ape_State));
+  memset(ctx, 0, sizeof(ape_Context));
 
   /* init allocator */
-  A->alloc = alloc;
-  A->ud = ud;
+  ctx->alloc = alloc;
+  ctx->ud = ud;
+
+  /* init state */
+  ctx->state.ctx = ctx;
+  A = &ctx->state;
 
   /* init GC */
-  if (gc_create(A, GCSTACKSIZE) < 0) {
+  if (gc_create(A) < 0) {
     ape_close(A);
     return NULL;
   }
@@ -681,20 +613,20 @@ ape_State *ape_newstate(ape_Alloc f, void *ud) {
 
 void ape_close(ape_State *A) {
   gc_destroy(A);
-  ape_free(A, A);
+  ape_free(A, CTX(A));
 }
 
-ape_Handlers *ape_handlers(ape_State *A) { return &A->handlers; }
+ape_Handlers *ape_handlers(ape_State *A) { return &CTX(A)->handlers; }
 
 static void raise_error(ape_State *A, const char *errmsg) {
-  ape_Cell *cl = A->calllist;
+  ape_Object cl = CTX(A)->calllist;
 
   /* reset context state */
-  A->calllist = nil;
+  CTX(A)->calllist = nil;
 
   /* do error handler */
-  if (A->handlers.error)
-    A->handlers.error(A, errmsg, cl);
+  if (CTX(A)->handlers.error)
+    CTX(A)->handlers.error(A, errmsg, cl);
 
   /* error handler returned -- print error and traceback, exit */
   fprintf(stderr, "error: %s\n", errmsg);
@@ -763,10 +695,14 @@ ape_Object ape_checktype(ape_State *A, ape_Object obj, int type) {
 }
 
 ape_Object ape_cons(ape_State *A, ape_Object car, ape_Object cdr) {
-  ape_Object obj = create_object(A);
-  car(obj) = car;
-  cdr(obj) = cdr;
-  return obj;
+  ape_defvar3(A, pair, carp, cdrp);
+
+  *carp = car;
+  *cdrp = cdr;
+  *pair = create_object(A);
+  car(*pair) = *carp;
+  cdr(*pair) = *cdrp;
+  return *pair;
 }
 
 ape_Object ape_car(ape_State *A, ape_Object obj) {
@@ -791,12 +727,12 @@ ape_Object ape_setcdr(ape_State *A, ape_Object obj, ape_Object cdr) {
   return obj;
 }
 
-ape_Object ape_true(ape_State *A) { return A->t; }
-
 ape_Object ape_nil(ape_State *A) {
   unused(A);
   return nil;
 }
+
+ape_Object ape_true(ape_State *A) { return CTX(A)->t; }
 
 ape_Object ape_bool(ape_State *A, int b) {
   return b ? ape_true(A) : ape_nil(A);
@@ -807,26 +743,30 @@ ape_Object ape_integer(ape_State *A, long long n) {
 }
 
 ape_Object ape_number(ape_State *A, double n) {
-  ape_Object obj = create_object(A);
-  settype(obj, APE_TNUMBER);
-  number(obj) = (decimal_t)n;
-  return obj;
+  ape_defvar1(A, obj);
+
+  *obj = create_object(A);
+  settype(*obj, APE_TNUMBER);
+  number(*obj) = (decimal_t)n;
+  return *obj;
 }
 
 static ape_Object build_string(ape_State *A, ape_Object tail, int ch) {
   int index;
 
   if (!tail || (tag(tail) & FCMARKBIT)) {
-    ape_Object obj = ape_cons(A, NULL, nil);
-    settype(obj, APE_TSTRING);
+    ape_defvar2(A, obj, tailp);
 
-    if (!tail)
-      return obj;
+    *tailp = tail;
+    *obj = create_object(A);
+    settype(*obj, APE_TSTRING);
+    cdr(*obj) = nil;
 
-    cdr(tail) = obj;
-    gc_pop(A);
+    if (!*tailp)
+      return *obj;
 
-    tail = obj;
+    cdr(*tailp) = *obj;
+    tail = *obj;
   }
 
   index = stridx(tail);
@@ -840,45 +780,21 @@ static ape_Object build_string(ape_State *A, ape_Object tail, int ch) {
   return tail;
 }
 
-static int string_ref(ape_State *A, ape_Object str, int idx) {
-  int cnt = 0;
-
-  while (idx >= 0) {
-    cnt = strcnt(str);
-
-    if (cnt == 0 || idx < cnt)
-      break;
-
-    str = cdr(str);
-    idx -= cnt;
-
-    if (isnil(str)) {
-      ape_error(A, "index out of range");
-      return 0;
-    }
-  }
-
-  if (cnt == 0) {
-    ape_error(A, "index out of range");
-    return 0;
-  }
-
-  return strbuf(str)[idx];
-}
-
 ape_Object ape_string(ape_State *A, const char *str) {
   return ape_lstring(A, str, (int)strlen(str));
 }
 
 ape_Object ape_lstring(ape_State *A, const char *str, int len) {
-  ape_Object obj = build_string(A, NULL, 0);
-  ape_Object tail = obj;
   int i;
+  ape_defvar2(A, obj, tail);
+
+  *obj = build_string(A, NULL, 0);
+  *tail = *obj;
 
   for (i = 0; i < len; ++i)
-    tail = build_string(A, tail, str[i]);
+    *tail = build_string(A, *tail, str[i]);
 
-  return obj;
+  return *obj;
 }
 
 static int strleq(ape_Object obj, const char *str, int len) {
@@ -899,22 +815,19 @@ static int strleq(ape_Object obj, const char *str, int len) {
   return isnil(obj) && j == len;
 }
 
-static int streq(ape_Object obj, const char *str) {
-  return strleq(obj, str, (int)strlen(str));
-}
-
 static ape_Object symbol(ape_State *A, uword_t h, const char *name, int len,
                          int pushlist) {
-  ape_Object obj = create_object(A);
+  ape_defvar1(A, obj);
 
-  settype(obj, APE_TSYMBOL);
-  hash(obj) = h;
-  cdr(obj) = ape_lstring(A, name, len);
+  *obj = create_object(A);
+  settype(*obj, APE_TSYMBOL);
+  hash(*obj) = h;
+  cdr(*obj) = ape_lstring(A, name, len);
 
   if (pushlist)
-    A->symlist = ape_cons(A, obj, A->symlist);
+    CTX(A)->symlist = ape_cons(A, *obj, CTX(A)->symlist);
 
-  return obj;
+  return *obj;
 }
 
 static uword_t fast_hash(const char *str, int len) {
@@ -933,7 +846,7 @@ ape_Object ape_symbol(ape_State *A, const char *name) {
   uword_t h = fast_hash(name, len);
 
   /* try to find in symlist */
-  for (obj = A->symlist; !isnil(obj); obj = cdr(obj))
+  for (obj = CTX(A)->symlist; !isnil(obj); obj = cdr(obj))
     if (hash(car(obj)) == h && strleq(cdr(car(obj)), name, len))
       return car(obj);
 
@@ -950,19 +863,19 @@ ape_Object ape_symbol(ape_State *A, const char *name) {
  */
 
 ape_Object ape_vector(ape_State *A, int len) {
-  ape_Object obj;
+  ape_defvar1(A, obj);
 
   if (len < 1) {
     ape_error(A, "vector length must greater than zero");
     return NULL;
   }
 
-  obj = create_object(A);
-  settype(obj, APE_TVECTOR);
-  veclen(obj) = len;
-  cdr(obj) = halloc(A, (len >> 1) + (len & 1));
+  *obj = create_object(A);
+  settype(*obj, APE_TVECTOR);
+  veclen(*obj) = len;
+  cdr(*obj) = halloc(A, (len >> 1) + (len & 1));
 
-  return obj;
+  return *obj;
 }
 
 static ape_Object *vector_place(ape_Object vec, int index) {
@@ -990,31 +903,67 @@ ape_Object ape_vecset(ape_State *A, ape_Object vec, int pos, ape_Object obj) {
 }
 
 ape_Object ape_cfunc(ape_State *A, ape_CFunc fn) {
-  ape_Object obj = create_object(A);
-  settype(obj, APE_TCFUNC);
-  cfunc(obj) = fn;
-  return obj;
+  ape_defvar1(A, obj);
+
+  *obj = create_object(A);
+  settype(*obj, APE_TCFUNC);
+  cfunc(*obj) = fn;
+  return *obj;
 }
 
 ape_Object ape_ptr(ape_State *A, void *ptr, int subtype) {
-  ape_Object obj = create_object(A);
-  settype(obj, APE_TPTR);
-  cdr(obj) = (ape_Object)ptr;
-  ptrtype(obj) = subtype & 0xFFFF;
-  return obj;
+  ape_defvar1(A, obj);
+
+  *obj = create_object(A);
+  settype(*obj, APE_TPTR);
+  ptrtype(*obj) = subtype & 0xFFFF;
+  cdr(*obj) = (ape_Object)ptr;
+  return *obj;
 }
 
 ape_Object ape_gensym(ape_State *A) {
   char gensym[16] = {0};
-  int len = sprintf(gensym, "#:%u", A->symid++);
+  int len = sprintf(gensym, "#:%u", CTX(A)->symid++);
 
   /* create new symbol, without push to symlist and return */
   return symbol(A, fast_hash(gensym, len), gensym, len, 0);
 }
 
-ape_Object ape_strref(ape_State *A, ape_Object obj, int idx) {
-  char ch = (char)string_ref(A, ape_checktype(A, obj, APE_TSTRING), idx);
-  return ape_lstring(A, &ch, 1);
+ape_Object ape_strappend(ape_State *A, ape_Object objs) {
+  int i, size;
+  ape_defvar4(A, objsp, obj, tail, str);
+
+  *objsp = objs;
+  *obj = build_string(A, NULL, 0);
+  *tail = *obj;
+
+  while (!isnil(*objsp)) {
+    *str = ape_checktype(A, ape_nextarg(A, objsp), APE_TSTRING);
+
+    while (!isnil(*str)) {
+      size = strcnt(*str);
+
+      for (i = 0; i < size; ++i)
+        *tail = build_string(A, *tail, strbuf(*str)[i]);
+
+      *str = cdr(*str);
+    }
+  }
+  return *obj;
+}
+
+ape_Object ape_strreverse(ape_State *A, ape_Object obj) {
+  int i, len = ape_strlen(A, ape_checktype(A, obj, APE_TSTRING));
+  ape_defvar3(A, objp, res, tail);
+
+  *objp = obj;
+  *res = build_string(A, NULL, 0);
+  *tail = *res;
+
+  for (i = 0; i < len; ++i)
+    *tail = build_string(A, *tail, ape_strref(A, *objp, len - i - 1));
+
+  return *res;
 }
 
 ape_Object ape_vecref(ape_State *A, ape_Object obj, int idx) {
@@ -1030,46 +979,32 @@ ape_Object ape_vecref(ape_State *A, ape_Object obj, int idx) {
   return place ? *place : nil;
 }
 
-ape_Object ape_strappend(ape_State *A, ape_Object objs) {
-  ape_Object obj = build_string(A, NULL, 0);
-  ape_Object tail = obj;
-  ape_Object str;
-  int i, size;
+int ape_strref(ape_State *A, ape_Object obj, int idx) {
+  int cnt = 0;
 
-  while (!isnil(objs)) {
-    str = ape_checktype(A, ape_nextarg(A, &objs), APE_TSTRING);
+  obj = ape_checktype(A, obj, APE_TSTRING);
 
-    while (!isnil(str)) {
-      size = strcnt(str);
+  while (idx >= 0) {
+    cnt = strcnt(obj);
 
-      for (i = 0; i < size; ++i)
-        tail = build_string(A, tail, strbuf(str)[i]);
+    if (cnt == 0 || idx < cnt)
+      break;
 
-      str = cdr(str);
+    obj = cdr(obj);
+    idx -= cnt;
+
+    if (isnil(obj)) {
+      ape_error(A, "index out of range");
+      return 0;
     }
   }
-  return obj;
-}
 
-ape_Object ape_strreverse(ape_State *A, ape_Object obj) {
-  int i, len = ape_strlen(A, ape_checktype(A, obj, APE_TSTRING));
-  ape_Object res = build_string(A, NULL, 0);
-  ape_Object tail = res;
+  if (cnt == 0) {
+    ape_error(A, "index out of range");
+    return 0;
+  }
 
-  for (i = 0; i < len; ++i)
-    tail = build_string(A, tail, string_ref(A, obj, len - i - 1));
-
-  return res;
-}
-
-int ape_length(ape_State *A, ape_Object obj) {
-  int len;
-  obj = ape_checktype(A, obj, APE_TPAIR);
-
-  for (len = 0; !isnil(obj); obj = cdr(obj))
-    len += 1;
-
-  return len;
+  return strbuf(obj)[idx];
 }
 
 int ape_strlen(ape_State *A, ape_Object obj) {
@@ -1134,14 +1069,14 @@ static ape_Cell rparen = {0};
 
 static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
-  ape_Object v, res, *tail;
   decimal_t n;
   int ch;
   char buf[APE_SYMSIZE] = {0}, *p;
+  ape_defvar3(A, v, res, tail);
 
   /* get next character */
-  ch = A->next_char ? A->next_char : fn(A, udata);
-  A->next_char = 0;
+  ch = CTX(A)->next_char ? CTX(A)->next_char : fn(A, udata);
+  CTX(A)->next_char = 0;
 
   /* skip whitespace */
   while (ch && isspace(ch))
@@ -1162,84 +1097,87 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     return &rparen;
 
   case '(':
-    res = nil;
-    tail = &res;
+    *res = ape_cons(A, nil, nil);
+    *tail = *res;
 
-    while ((v = reader(A, fn, udata)) != &rparen) {
-      if (v == NULL) {
+    while ((*v = reader(A, fn, udata)) != &rparen) {
+      if (*v == NULL) {
         ape_error(A, "unclosed list");
         return NULL;
       }
 
-      if (type(v) == APE_TSYMBOL && strleq(cdr(v), ".", 1))
+      if (type(*v) == APE_TSYMBOL && strleq(cdr(*v), ".", 1))
         /* dotted pair */
-        *tail = ape_read(A, fn, udata);
+        cdr(*tail) = ape_read(A, fn, udata);
       else {
         /* proper pair */
-        *tail = ape_cons(A, v, nil);
-        tail = &cdr(*tail);
+        cdr(*tail) = ape_cons(A, *v, nil);
+        *tail = cdr(*tail);
       }
     }
-    return res;
+    return cdr(*res);
 
   case '\'':
-    v = ape_read(A, fn, udata);
+    *v = ape_read(A, fn, udata);
 
-    if (!v) {
+    if (!*v) {
       ape_error(A, "stray '''");
       return NULL;
     }
 
     /* Transform: '(...) => (quote (...)) */
-    return ape_cons(A, A->primsyms[P_QUOTE], ape_cons(A, v, nil));
+    *res = ape_cons(A, *v, nil);
+    return ape_cons(A, CTX(A)->primsyms[P_QUOTE], *res);
 
   case '#':
-    v = ape_read(A, fn, udata);
+    *v = ape_read(A, fn, udata);
 
-    if (!v) {
+    if (!*v) {
       ape_error(A, "stray '#'");
       return NULL;
     }
 
     /* Transform: #(...) => (vector ...) */
-    return ape_cons(A, A->primsyms[P_VECTOR], ape_checktype(A, v, APE_TPAIR));
+    return ape_cons(A, CTX(A)->primsyms[P_VECTOR],
+                    ape_checktype(A, *v, APE_TPAIR));
 
   case '`':
-    v = ape_read(A, fn, udata);
+    *v = ape_read(A, fn, udata);
 
-    if (!v) {
+    if (!*v) {
       ape_error(A, "stray '`'");
       return NULL;
     }
 
     /* Transform: `(...) => (quasiquote (...)) */
-    return ape_cons(A, A->primsyms[P_QUASIQUOTE], ape_cons(A, v, nil));
+    *res = ape_cons(A, *v, nil);
+    return ape_cons(A, CTX(A)->primsyms[P_QUASIQUOTE], *res);
 
   case ',':
     ch = fn(A, udata);
 
     if (ch != '@')
-      A->next_char = ch;
+      CTX(A)->next_char = ch;
 
-    v = ape_read(A, fn, udata);
+    *v = ape_read(A, fn, udata);
 
-    if (!v) {
+    if (!*v) {
       ape_error(A, "stray ','");
       return NULL;
     }
 
-    res = ape_cons(A, v, nil);
+    *res = ape_cons(A, *v, nil);
 
     /* Transform: ,@v => (unquote-splicing (v)) */
     if (ch == '@')
-      return ape_cons(A, A->primsyms[P_UNQUOTE_SPLICING], res);
+      return ape_cons(A, CTX(A)->primsyms[P_UNQUOTE_SPLICING], *res);
 
     /* Transform: ,v => (unquote (v)) */
-    return ape_cons(A, A->primsyms[P_UNQUOTE], res);
+    return ape_cons(A, CTX(A)->primsyms[P_UNQUOTE], *res);
 
   case '"':
-    res = build_string(A, NULL, 0);
-    v = res;
+    *res = build_string(A, NULL, 0);
+    *v = *res;
 
     ch = fn(A, udata);
     while (ch != '"') {
@@ -1260,10 +1198,10 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
           ch = strchr("n\nr\rt\t\\\\\"\"", ch)[1];
       }
 
-      v = build_string(A, v, ch);
+      *v = build_string(A, *v, ch);
       ch = fn(A, udata);
     }
-    return res;
+    return *res;
 
   default:
     p = buf;
@@ -1277,7 +1215,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       ch = fn(A, udata);
     } while (ch && !strchr(delimiter, ch) && !isspace(ch));
 
-    A->next_char = ch;
+    CTX(A)->next_char = ch;
 
     /* try to read as number */
     n = (decimal_t)strtod(buf, &p);
@@ -1428,7 +1366,7 @@ ape_Object ape_unbound(ape_State *A, ape_Object sym, ape_Object env,
                        int recur) {
   ape_Object *frame, bound;
 
-  env = env ? env : A->env;
+  env = env ? env : CTX(A)->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
 
   frame = getbound(sym, env, recur ? ENV_RECUR : 0);
@@ -1443,28 +1381,33 @@ ape_Object ape_unbound(ape_State *A, ape_Object sym, ape_Object env,
 
 ape_Object ape_def(ape_State *A, ape_Object sym, ape_Object val,
                    ape_Object env) {
-  ape_Object *frame, bound;
+  ape_Object *frame;
+  ape_defvar5(A, bound, symp, valp, envp, va);
 
-  env = env ? env : A->env;
-  sym = ape_checktype(A, sym, APE_TSYMBOL);
+  env = env ? env : CTX(A)->env;
 
-  frame = getbound(sym, env, ENV_CREATE);
+  *symp = ape_checktype(A, sym, APE_TSYMBOL);
+  *valp = val;
+  *envp = env;
+
+  *va = ape_cons(A, *symp, *valp);
+  *bound = ape_cons(A, *va, nil);
+  frame = getbound(*symp, *envp, ENV_CREATE);
 
   if (!isnil(*frame)) {
     ape_error(A, "variables cannot be redefined");
     return NULL;
   }
 
-  bound = ape_cons(A, sym, val);
-  *frame = ape_cons(A, bound, nil);
-  return val;
+  *frame = *bound;
+  return *valp;
 }
 
 ape_Object ape_set(ape_State *A, ape_Object sym, ape_Object val,
                    ape_Object env) {
   ape_Object *frame, bound;
 
-  env = env ? env : A->env;
+  env = env ? env : CTX(A)->env;
   sym = ape_checktype(A, sym, APE_TSYMBOL);
 
   frame = getbound(sym, env, ENV_RECUR);
@@ -1496,96 +1439,115 @@ ape_Object ape_nextarg(ape_State *A, ape_Object *args) {
   return car(arg);
 }
 
-#define evalarg() ape_eval(A, ape_nextarg(A, &args), env)
+#define evalarg(args, env) ape_eval(A, ape_nextarg(A, args), *env)
 
 static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
                             int *argc) {
-  ape_Object res = nil;
-  ape_Object *tail = &res;
   int cnt = 0;
+  ape_defvar5(A, listp, envp, res, tail, va);
 
-  while (!isnil(list)) {
-    *tail = ape_cons(A, ape_eval(A, ape_nextarg(A, &list), env), nil);
-    tail = &cdr(*tail);
+  *listp = list;
+  *envp = env;
+  *res = ape_cons(A, nil, nil);
+  *tail = *res;
+
+  while (!isnil(*listp)) {
+    *va = ape_eval(A, ape_nextarg(A, listp), *envp);
+    cdr(*tail) = ape_cons(A, *va, nil);
+    *tail = cdr(*tail);
     cnt += 1;
   }
 
   if (argc)
     *argc = cnt;
 
-  return res;
+  return cdr(*res);
 }
 
 static ape_Object arith_add(ape_State *A, ape_Object args, ape_Object env) {
   decimal_t res = 0;
+  ape_defvar2(A, argsp, envp);
 
-  while (!isnil(args))
-    res += number(ape_checktype(A, evalarg(), APE_TNUMBER));
+  *argsp = args;
+  *envp = env;
+
+  while (!isnil(*argsp))
+    res += number(ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER));
 
   return ape_number(A, res);
 }
 
 static ape_Object arith_sub(ape_State *A, ape_Object args, ape_Object env) {
   decimal_t res;
-  ape_Object x;
+  ape_defvar3(A, x, argsp, envp);
 
-  if (isnil(args)) {
+  *argsp = args;
+  *envp = env;
+
+  if (isnil(*argsp)) {
     ape_error(A, "wrong number of operands");
     return NULL;
   }
 
-  x = ape_checktype(A, evalarg(), APE_TNUMBER);
+  *x = ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER);
 
-  if (isnil(args))
-    return ape_number(A, -number(x));
+  if (isnil(*argsp))
+    return ape_number(A, -number(*x));
 
-  res = number(x);
+  res = number(*x);
 
-  while (!isnil(args))
-    res -= number(ape_checktype(A, evalarg(), APE_TNUMBER));
+  while (!isnil(*argsp))
+    res -= number(ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER));
 
   return ape_number(A, res);
 }
 
 static ape_Object arith_mul(ape_State *A, ape_Object args, ape_Object env) {
   decimal_t res = 1;
+  ape_defvar2(A, argsp, envp);
 
-  while (!isnil(args))
-    res *= number(ape_checktype(A, evalarg(), APE_TNUMBER));
+  *argsp = args;
+  *envp = env;
+
+  while (!isnil(*argsp))
+    res *= number(ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER));
 
   return ape_number(A, res);
 }
 
 static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
   decimal_t res;
-  ape_Object x;
+  ape_defvar3(A, x, argsp, envp);
 
-  if (isnil(args)) {
+  *argsp = args;
+  *envp = env;
+
+  if (isnil(*argsp)) {
     ape_error(A, "wrong number of operands");
     return NULL;
   }
 
-  x = ape_checktype(A, evalarg(), APE_TNUMBER);
+  *x = ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER);
 
-  if (isnil(args))
+  if (isnil(*argsp))
     res = (decimal_t)1;
   else {
-    res = number(x);
-    x = ape_checktype(A, evalarg(), APE_TNUMBER);
+    res = number(*x);
+    *x = ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER);
   }
 
   do {
-    if (fabs(number(x) - (decimal_t)0) < DEC_EPSILON) {
+    if (fabs(number(*x) - (decimal_t)0) < DEC_EPSILON) {
       ape_error(A, "division by zero");
       return NULL;
     }
 
-    res /= number(x);
+    res /= number(*x);
 
-    if (isnil(args))
+    if (isnil(*argsp))
       break;
 
-    x = ape_checktype(A, evalarg(), APE_TNUMBER);
+    *x = ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER);
   } while (1);
 
   return ape_number(A, res);
@@ -1593,117 +1555,126 @@ static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
 
 #define arith_compare(A, args, env, op)                                        \
   do {                                                                         \
-    res = NULL;                                                                \
-    if (isnil(args))                                                           \
-      res = A->t;                                                              \
+    *res = NULL;                                                               \
+    if (isnil(*args))                                                          \
+      *res = CTX(A)->t;                                                        \
     else {                                                                     \
-      va = ape_checktype(A, evalarg(), APE_TNUMBER);                           \
-      if (isnil(args))                                                         \
-        res = A->t;                                                            \
+      *va = ape_checktype(A, evalarg(args, env), APE_TNUMBER);                 \
+      if (isnil(*args))                                                        \
+        *res = CTX(A)->t;                                                      \
       else {                                                                   \
-        while (!isnil(args)) {                                                 \
-          vb = ape_checktype(A, evalarg(), APE_TNUMBER);                       \
-          if (!(number(va) op number(vb))) {                                   \
-            res = nil;                                                        \
+        while (!isnil(*args)) {                                                \
+          *vb = ape_checktype(A, evalarg(args, env), APE_TNUMBER);             \
+          if (!(number(*va) op number(*vb))) {                                 \
+            *res = nil;                                                        \
             break;                                                             \
           }                                                                    \
         }                                                                      \
-        if (!res)                                                              \
-          res = A->t;                                                          \
+        if (!*res)                                                             \
+          *res = CTX(A)->t;                                                    \
       }                                                                        \
     }                                                                          \
   } while (0)
 
 static void args_binds(ape_State *A, ape_Object syms, ape_Object args,
                        ape_Object env) {
-  ape_Object bind;
+  ape_defvar6(A, bind, symsp, argp, argsp, envp, va);
 
-  while (!isnil(syms)) {
+  *symsp = syms;
+  *argsp = args;
+  *envp = env;
+
+  while (!isnil(*symsp)) {
     /* rest arguments */
-    if (type(syms) != APE_TPAIR) {
-      ape_def(A, syms, args, env);
+    if (type(*symsp) != APE_TPAIR) {
+      ape_def(A, *symsp, *argsp, *envp);
       return;
     }
 
-    bind = car(syms);
+    *bind = car(*symsp);
 
-    if (isnil(args)) {
-      ape_Object arg;
-
-      if (type(bind) != APE_TPAIR) {
+    if (isnil(*argsp)) {
+      if (type(*bind) != APE_TPAIR) {
         ape_error(A, "wrong number of arguments");
         return;
       }
 
-      arg = cdr(bind);
+      *argp = cdr(*bind);
       /* default argument */
-      ape_def(A, car(bind), ape_eval(A, car(arg), env), env);
+      *va = ape_eval(A, car(*argp), *envp);
+      ape_def(A, car(*bind), *va, *envp);
     } else {
-      if (type(bind) == APE_TPAIR)
-        bind = car(bind);
+      if (type(*bind) == APE_TPAIR)
+        *bind = car(*bind);
 
       /* bind argument */
-      ape_def(A, bind, car(args), env);
+      ape_def(A, *bind, car(*argsp), *envp);
     }
 
-    syms = cdr(syms);
-    args = cdr(args);
+    *symsp = cdr(*symsp);
+    *argsp = cdr(*argsp);
   }
 }
 
 static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
-  ape_Object res = nil;
-  ape_Object *tail = &res;
+  ape_defvar9(A, exprp, envp, res, tail, obj, arg, args, fn, va);
 
   if (type(expr) != APE_TPAIR)
     return expr;
 
-  while (!isnil(expr)) {
-    ape_Object obj = ape_nextarg(A, &expr);
+  *exprp = expr;
+  *envp = env;
+  *res = ape_cons(A, nil, nil);
+  *tail = *res;
 
-    if (type(obj) == APE_TPAIR) {
-      ape_Object fn = car(obj);
-      ape_Object args = cdr(obj);
+  while (!isnil(*exprp)) {
+    *obj = ape_nextarg(A, exprp);
 
-      if (fn == A->primsyms[P_UNQUOTE_SPLICING]) {
-        ape_Object arg = ape_nextarg(A, &args);
+    if (type(*obj) == APE_TPAIR) {
+      *fn = car(*obj);
+      *args = cdr(*obj);
 
-        arg = quasiquote(A, ape_cons(A, arg, nil), env);
-        arg = car(ape_checktype(A, arg, APE_TPAIR));
+      if (*fn == CTX(A)->primsyms[P_UNQUOTE_SPLICING]) {
+        *arg = ape_nextarg(A, args);
 
-        obj = ape_checktype(A, ape_eval(A, arg, env), APE_TPAIR);
+        *va = ape_cons(A, *arg, nil);
+        *arg = quasiquote(A, *va, *envp);
+        *arg = car(ape_checktype(A, *arg, APE_TPAIR));
 
-        for (; !isnil(obj); obj = cdr(obj)) {
+        *obj = ape_checktype(A, ape_eval(A, *arg, *envp), APE_TPAIR);
+
+        for (; !isnil(*obj); *obj = cdr(*obj)) {
           /* (x . y) => (x y) */
-          if (type(obj) != APE_TPAIR) {
-            *tail = ape_cons(A, obj, nil);
-            tail = &cdr(*tail);
+          if (type(*obj) != APE_TPAIR) {
+            cdr(*tail) = ape_cons(A, *obj, nil);
+            *tail = cdr(*tail);
             break;
           }
 
           /* copy list */
-          *tail = ape_cons(A, car(obj), nil);
-          tail = &cdr(*tail);
+          cdr(*tail) = ape_cons(A, car(*obj), nil);
+          *tail = cdr(*tail);
         }
 
         continue;
-      } else if (fn == A->primsyms[P_UNQUOTE]) {
-        ape_Object arg = ape_nextarg(A, &args);
+      } else if (*fn == CTX(A)->primsyms[P_UNQUOTE]) {
+        *arg = ape_nextarg(A, args);
 
-        if (type(arg) == APE_TPAIR) {
-          arg = quasiquote(A, ape_cons(A, arg, nil), env);
-          arg = car(ape_checktype(A, arg, APE_TPAIR));
+        if (type(*arg) == APE_TPAIR) {
+          *va = ape_cons(A, *arg, nil);
+          *arg = quasiquote(A, *va, *envp);
+          *arg = car(ape_checktype(A, *arg, APE_TPAIR));
         }
 
-        obj = ape_eval(A, arg, env);
+        *obj = ape_eval(A, *arg, *envp);
       } else
-        obj = quasiquote(A, obj, env);
+        *obj = quasiquote(A, *obj, *envp);
     }
 
-    *tail = ape_cons(A, obj, nil);
-    tail = &cdr(*tail);
+    cdr(*tail) = ape_cons(A, *obj, nil);
+    *tail = cdr(*tail);
   }
-  return res;
+  return cdr(*res);
 }
 
 /*      Function / Macro
@@ -1721,34 +1692,38 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
  */
 
 static ape_Object expand(ape_State *A, ape_Object macro, ape_Object args) {
-  ape_Object body, head, env;
+  ape_defvar5(A, macrop, argsp, body, head, env);
+
+  *macrop = macro;
+  *argsp = args;
 
   /* ((env . args) . (do ...)) */
-  body = cdr(ape_checktype(A, macro, APE_TMACRO));
+  *body = cdr(ape_checktype(A, *macrop, APE_TMACRO));
   /* (env . args) */
-  head = car(body);
+  *head = car(*body);
 
   /* arguments environment */
-  env = create_env(A, car(head));
-  args_binds(A, cdr(head), args, env);
+  *env = create_env(A, car(*head));
+  args_binds(A, cdr(*head), *argsp, *env);
 
   /* generate code by macro */
-  return ape_eval(A, cdr(body), env);
+  return ape_eval(A, cdr(*body), *env);
 }
 
 ape_Object ape_eval(ape_State *A, ape_Object expr, ape_Object env) {
-  ape_Object fn, args;
-  ape_Cell cl;
-  ape_Object res, va, vb; /* registers */
   int argc, i;
+  ape_defvar8(A, exprp, envp, fn, args, res, va, vb, vc);
 
-  env = env ? env : A->env;
+  env = env ? env : CTX(A)->env;
+
+  *exprp = expr;
+  *envp = env;
 
 EVAL:
-  if (type(expr) == APE_TSYMBOL) {
+  if (type(*exprp) == APE_TSYMBOL) {
     ape_Object *frame, bound;
 
-    frame = getbound(expr, env, ENV_RECUR);
+    frame = getbound(*exprp, *envp, ENV_RECUR);
 
     if (!frame || isnil(*frame)) {
       ape_error(A, "unbound variables");
@@ -1756,58 +1731,57 @@ EVAL:
     }
 
     bound = car(*frame);
-    /* Prevent local variables from being accidentally GC */
     return cdr(bound);
   }
 
-  if (type(expr) != APE_TPAIR)
-    return expr;
+  if (type(*exprp) != APE_TPAIR)
+    return *exprp;
 
-  car(&cl) = expr;
-  cdr(&cl) = A->calllist;
-  A->calllist = &cl;
+  CTX(A)->calllist = ape_cons(A, *exprp, CTX(A)->calllist);
 
-  fn = ape_eval(A, car(expr), env);
-  args = cdr(expr);
-  res = nil;
+  *fn = ape_eval(A, car(*exprp), *envp);
+  *args = cdr(*exprp);
+  *res = nil;
 
-  switch (type(fn)) {
+  switch (type(*fn)) {
   case APE_TPRIM:
-    switch (prim(fn)) {
+    switch (prim(*fn)) {
     case P_DEF:
-      va = ape_nextarg(A, &args);
-      res = ape_def(A, va, evalarg(), env);
+      *va = ape_nextarg(A, args);
+      *vb = evalarg(args, envp);
+      *res = ape_def(A, *va, *vb, *envp);
       break;
     case P_SET:
-      va = ape_nextarg(A, &args);
-      res = ape_set(A, va, evalarg(), env);
+      *va = ape_nextarg(A, args);
+      *vb = evalarg(args, envp);
+      *res = ape_set(A, *va, *vb, *envp);
       break;
     case P_IF:
-      va = evalarg();
-      vb = ape_nextarg(A, &args);
+      *va = evalarg(args, envp);
+      *vb = ape_nextarg(A, args);
 
-      expr = !isnil(va) ? vb : ape_nextarg(A, &args);
+      *exprp = !isnil(*va) ? *vb : ape_nextarg(A, args);
 
-      A->calllist = cdr(&cl);
+      CTX(A)->calllist = cdr(CTX(A)->calllist);
       goto EVAL;
     case P_FN:
     case P_MACRO:
-      va = ape_cons(A, env, ape_nextarg(A, &args));
-      vb = ape_cons(A, A->primsyms[P_DO], args);
-      res = create_object(A);
-      settype(res, prim(fn) == P_FN ? APE_TFUNC : APE_TMACRO);
-      cdr(res) = ape_cons(A, va, vb);
+      *va = ape_cons(A, *envp, ape_nextarg(A, args));
+      *vb = ape_cons(A, CTX(A)->primsyms[P_DO], *args);
+      *res = create_object(A);
+      settype(*res, prim(*fn) == P_FN ? APE_TFUNC : APE_TMACRO);
+      cdr(*res) = ape_cons(A, *va, *vb);
       break;
     case P_EXPAND:
-      va = evalarg();
-      vb = ape_eval(A, car(va), env);
-      res = expand(A, vb, cdr(va));
+      *va = evalarg(args, envp);
+      *vb = ape_eval(A, car(*va), *envp);
+      *res = expand(A, *vb, cdr(*va));
       break;
     case P_QUOTE:
-      res = ape_nextarg(A, &args);
+      *res = ape_nextarg(A, args);
       break;
     case P_QUASIQUOTE:
-      res = quasiquote(A, ape_nextarg(A, &args), env);
+      *res = quasiquote(A, ape_nextarg(A, args), *envp);
       break;
     case P_UNQUOTE:
       ape_error(A, "unquote outside a quasiquote");
@@ -1816,102 +1790,105 @@ EVAL:
       ape_error(A, "unquote-splicing outside a quasiquote");
       break;
     case P_AND:
-      while (!isnil(args) && !isnil(res = evalarg()))
+      while (!isnil(*args) && !isnil(*res = evalarg(args, envp)))
         ;
       break;
     case P_OR:
-      while (!isnil(args) && isnil(res = evalarg()))
+      while (!isnil(*args) && isnil(*res = evalarg(args, envp)))
         ;
       break;
     case P_NOT:
-      res = ape_bool(A, isnil(evalarg()));
+      *res = ape_bool(A, isnil(evalarg(args, envp)));
       break;
     case P_DO:
-      if (!isnil(args)) {
-        for (; !isnil(cdr(args)); args = cdr(args))
-          ape_eval(A, car(args), env);
+      if (!isnil(*args)) {
+        for (; !isnil(cdr(*args)); *args = cdr(*args))
+          ape_eval(A, car(*args), *envp);
 
-        expr = car(args);
+        *exprp = car(*args);
 
-        A->calllist = cdr(&cl);
+        CTX(A)->calllist = cdr(CTX(A)->calllist);
         goto EVAL;
       }
       break;
     case P_CONS:
-      va = evalarg();
-      res = ape_cons(A, va, evalarg());
+      *va = evalarg(args, envp);
+      *vb = evalarg(args, envp);
+      *res = ape_cons(A, *va, *vb);
       break;
     case P_CAR:
-      res = ape_car(A, evalarg());
+      *res = ape_car(A, evalarg(args, envp));
       break;
     case P_CDR:
-      res = ape_cdr(A, evalarg());
+      *res = ape_cdr(A, evalarg(args, envp));
       break;
     case P_SETCAR:
-      va = evalarg();
-      res = ape_setcar(A, va, evalarg());
+      *va = evalarg(args, envp);
+      *vb = evalarg(args, envp);
+      *res = ape_setcar(A, *va, *vb);
       break;
     case P_SETCDR:
-      va = evalarg();
-      res = ape_setcdr(A, va, evalarg());
+      *va = evalarg(args, envp);
+      *vb = evalarg(args, envp);
+      *res = ape_setcdr(A, *va, *vb);
       break;
     case P_TYPE:
-      va = evalarg();
-      res = A->typesyms[type(va)];
+      *va = evalarg(args, envp);
+      *res = CTX(A)->typesyms[type(*va)];
       break;
     case P_VECTOR:
-      va = eval_list(A, args, env, &argc);
-      vb = ape_vector(A, argc);
+      *va = eval_list(A, *args, *envp, &argc);
+      *res = ape_vector(A, argc);
 
       for (i = 0; i < argc; ++i)
-        ape_vecset(A, vb, i, ape_nextarg(A, &va));
-
-      res = vb;
+        ape_vecset(A, *res, i, ape_nextarg(A, va));
       break;
     case P_VECSET:
-      va = evalarg();
-      vb = ape_checktype(A, evalarg(), APE_TNUMBER);
-      res = ape_vecset(A, va, (int)number(vb), evalarg());
+      *va = evalarg(args, envp);
+      *vb = ape_checktype(A, evalarg(args, envp), APE_TNUMBER);
+      *vc = evalarg(args, envp);
+      *res = ape_vecset(A, *va, (int)number(*vb), *vc);
       break;
     case P_EQ:
-      va = evalarg();
-      res = ape_bool(A, ape_equal(A, va, evalarg()));
+      *va = evalarg(args, envp);
+      *vb = evalarg(args, envp);
+      *res = ape_bool(A, ape_equal(A, *va, *vb));
       break;
     case P_LT:
-      arith_compare(A, args, env, <);
+      arith_compare(A, args, envp, <);
 
-      if (!isnil(res) && ape_equal(A, va, vb))
-        res = nil;
+      if (!isnil(*res) && ape_equal(A, *va, *vb))
+        *res = nil;
       break;
     case P_LTE:
-      arith_compare(A, args, env, <);
+      arith_compare(A, args, envp, <);
 
-      if (isnil(res) && ape_equal(A, va, vb))
-        res = A->t;
+      if (isnil(*res) && ape_equal(A, *va, *vb))
+        *res = CTX(A)->t;
       break;
     case P_GT:
-      arith_compare(A, args, env, >);
+      arith_compare(A, args, envp, >);
 
-      if (!isnil(res) && ape_equal(A, va, vb))
-        res = nil;
+      if (!isnil(*res) && ape_equal(A, *va, *vb))
+        *res = nil;
       break;
     case P_GTE:
-      arith_compare(A, args, env, >);
+      arith_compare(A, args, envp, >);
 
-      if (isnil(res) && ape_equal(A, va, vb))
-        res = A->t;
+      if (isnil(*res) && ape_equal(A, *va, *vb))
+        *res = CTX(A)->t;
       break;
     case P_ADD:
-      res = arith_add(A, args, env);
+      *res = arith_add(A, *args, *envp);
       break;
     case P_SUB:
-      res = arith_sub(A, args, env);
+      *res = arith_sub(A, *args, *envp);
       break;
     case P_MUL:
-      res = arith_mul(A, args, env);
+      *res = arith_mul(A, *args, *envp);
       break;
     case P_DIV:
-      res = arith_div(A, args, env);
+      *res = arith_div(A, *args, *envp);
       break;
     default:
       ape_error(A, "undefined primitive");
@@ -1919,41 +1896,40 @@ EVAL:
     }
     break;
   case APE_TCFUNC:
-    va = eval_list(A, args, env, &argc);
-    res = cfunc(fn)(A, argc, va, env);
+    *va = eval_list(A, *args, *envp, &argc);
+    *res = cfunc(*fn)(A, argc, *va, *envp);
     break;
   case APE_TFUNC:
-    va = cdr(fn); /* ((env . args) . (do ...)) */
-    vb = car(va); /* (env . args)*/
+    *va = cdr(*fn); /* ((env . args) . (do ...)) */
+    *vb = car(*va); /* (env . args)*/
 
-    args = eval_list(A, args, env, NULL);
+    *args = eval_list(A, *args, *envp, NULL);
 
     /* new local environment */
-    env = create_env(A, car(vb));
-    args_binds(A, cdr(vb), args, env);
+    *envp = create_env(A, car(*vb));
+    args_binds(A, cdr(*vb), *args, *envp);
 
-    expr = cdr(va); /* do block */
+    *exprp = cdr(*va); /* do block */
 
-    A->calllist = cdr(&cl);
+    CTX(A)->calllist = cdr(CTX(A)->calllist);
     goto EVAL;
   case APE_TMACRO:
-    expr = expand(A, fn, args);
+    *exprp = expand(A, *fn, *args);
 
-    A->calllist = cdr(&cl);
+    CTX(A)->calllist = cdr(CTX(A)->calllist);
     goto EVAL;
   default:
     ape_error(A, "tried to call non-callable value");
     break;
   }
 
-  A->calllist = cdr(&cl);
-
-  return res;
+  CTX(A)->calllist = cdr(CTX(A)->calllist);
+  return *res;
 }
 
 ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
-  ape_Object expr;
   FILE *fp;
+  ape_defvar2(A, expr, envp);
 
   fp = fopen(file, "rb");
 
@@ -1962,15 +1938,16 @@ ape_Object ape_load(ape_State *A, const char *file, ape_Object env) {
     return NULL;
   }
 
-  env = env ? env : A->env;
+  env = env ? env : CTX(A)->env;
+  *envp = env;
 
   for (;;) {
-    expr = ape_readfp(A, fp);
+    *expr = ape_readfp(A, fp);
 
-    if (!expr)
+    if (!*expr)
       break;
 
-    ape_eval(A, expr, env);
+    ape_eval(A, *expr, *envp);
   }
 
   fclose(fp);

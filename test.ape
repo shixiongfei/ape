@@ -77,7 +77,7 @@
 
 
 (defn say-hello ((name "Ape"))
-  (concat "Hello " name "!"))
+  (string-append "Hello " name "!"))
 
 (print (say-hello))
 (print (say-hello "World"))

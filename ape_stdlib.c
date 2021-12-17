@@ -113,7 +113,8 @@ static ape_Object vector_length(ape_State *A, int argc, ape_Object args,
 static ape_Object string_ref(ape_State *A, int argc, ape_Object args,
                              ape_Object env) {
   int index = (int)ape_tointeger(A, ape_nextarg(A, &args));
-  return ape_strref(A, ape_nextarg(A, &args), index);
+  char ch = (char)ape_strref(A, ape_nextarg(A, &args), index);
+  return ape_lstring(A, &ch, 1);
 }
 
 static ape_Object vector_ref(ape_State *A, int argc, ape_Object args,
@@ -721,10 +722,14 @@ void stdlib_open(ape_State *A) {
       vector_tolist, list_tovector,
       NULL,
   };
+  ape_defvar2(A, va, vb);
 
   /* c libs */
-  for (const Function *func = cfuncs; func->name && func->func; ++func)
-    ape_def(A, ape_symbol(A, func->name), ape_cfunc(A, func->func), NULL);
+  for (const Function *func = cfuncs; func->name && func->func; ++func) {
+    *va = ape_symbol(A, func->name);
+    *vb = ape_cfunc(A, func->func);
+    ape_def(A, *va, *vb, NULL);
+  }
 
   /* ape libs */
   for (const char **lib = stdlib; *lib; ++lib) {
