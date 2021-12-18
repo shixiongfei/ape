@@ -338,7 +338,7 @@ static void copy_roots(ape_State *A, ape_Cell **roots) {
 
 static void copy_heap(ape_State *A) {
   GC *gc = &CTX(A)->gc;
-  ape_Cell *scan;
+  ape_Cell *scan, *vec, *p;
   int i;
 
   /* copy the symbol list */
@@ -375,8 +375,16 @@ static void copy_heap(ape_State *A) {
       copy_ref(A, &cdr(scan));
       break;
     case APE_TVECTOR:
-      for (i = 0; i < (int)((veclen(scan) >> 1) + (veclen(scan) & 1)); ++i)
-        copy_ref(A, &cdr(scan) + i);
+      vec = cdr(scan);
+      p = vec;
+      copy_ref(A, &vec);
+
+      for (i = 1; i < (int)((veclen(scan) >> 1) + (veclen(scan) & 1)); ++i) {
+        ape_Cell *cp = p + i;
+        copy_ref(A, &cp);
+      }
+
+      cdr(scan) = vec;
       break;
     }
   }
