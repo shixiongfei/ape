@@ -96,7 +96,7 @@ static ape_Object string(ape_State *A, int argc, ape_Object args,
 }
 
 static ape_Object string_append(ape_State *A, int argc, ape_Object args,
-                         ape_Object env) {
+                                ape_Object env) {
   return ape_strappend(A, args);
 }
 
@@ -124,7 +124,7 @@ static ape_Object vector_ref(ape_State *A, int argc, ape_Object args,
 }
 
 static ape_Object string_reverse(ape_State *A, int argc, ape_Object args,
-                          ape_Object env) {
+                                 ape_Object env) {
   return ape_strreverse(A, ape_nextarg(A, &args));
 }
 

@@ -527,7 +527,6 @@ static int gc_create(ape_State *A) {
     return -1;
 
   gc->head = gc->from;
-
   return 0;
 }
 
