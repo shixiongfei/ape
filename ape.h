@@ -16,10 +16,7 @@
 
 #define APE_MAJOR 0
 #define APE_MINOR 3
-#define APE_PATCH 0
-
-#define APE__PASTE(name, id) name##id
-#define APE_PASTE(name, id) APE__PASTE(name, id)
+#define APE_PATCH 1
 
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
@@ -36,6 +33,9 @@
 #define APE_API extern
 
 #define APE_SYMSIZE 64
+
+#define APE__PASTE(name, id) name##id
+#define APE_PASTE(name, id) APE__PASTE(name, id)
 
 #define APE_GCROOTEND ((void *)-1)
 #define APE_GCUNIQUE(name) APE_PASTE(name, __LINE__)

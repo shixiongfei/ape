@@ -824,12 +824,14 @@ static int strleq(ape_Object obj, const char *str, int len) {
 
 static ape_Object symbol(ape_State *A, uword_t h, const char *name, int len,
                          int pushlist) {
-  ape_defvar1(A, obj);
+  ape_defvar2(A, obj, str);
 
   *obj = create_object(A);
+  *str = ape_lstring(A, name, len);
+
   settype(*obj, APE_TSYMBOL);
   hash(*obj) = h;
-  cdr(*obj) = ape_lstring(A, name, len);
+  cdr(*obj) = *str;
 
   if (pushlist)
     CTX(A)->symlist = ape_cons(A, *obj, CTX(A)->symlist);
@@ -870,7 +872,7 @@ ape_Object ape_symbol(ape_State *A, const char *name) {
  */
 
 ape_Object ape_vector(ape_State *A, int len) {
-  ape_defvar1(A, obj);
+  ape_defvar2(A, obj, vec);
 
   if (len < 1) {
     ape_error(A, "vector length must greater than zero");
@@ -878,9 +880,11 @@ ape_Object ape_vector(ape_State *A, int len) {
   }
 
   *obj = create_object(A);
+  *vec = halloc(A, (len >> 1) + (len & 1));
+
   settype(*obj, APE_TVECTOR);
   veclen(*obj) = len;
-  cdr(*obj) = halloc(A, (len >> 1) + (len & 1));
+  cdr(*obj) = *vec;
 
   return *obj;
 }
@@ -1079,7 +1083,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   decimal_t n;
   int ch;
   char buf[APE_SYMSIZE] = {0}, *p;
-  ape_defvar3(A, v, res, tail);
+  ape_defvar4(A, v, res, tail, o);
 
   /* get next character */
   ch = CTX(A)->next_char ? CTX(A)->next_char : fn(A, udata);
@@ -1113,12 +1117,14 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
         return NULL;
       }
 
-      if (type(*v) == APE_TSYMBOL && strleq(cdr(*v), ".", 1))
+      if (type(*v) == APE_TSYMBOL && strleq(cdr(*v), ".", 1)) {
         /* dotted pair */
-        cdr(*tail) = ape_read(A, fn, udata);
-      else {
+        *o = ape_read(A, fn, udata);
+        cdr(*tail) = *o;
+      } else {
         /* proper pair */
-        cdr(*tail) = ape_cons(A, *v, nil);
+        *o = ape_cons(A, *v, nil);
+        cdr(*tail) = *o;
         *tail = cdr(*tail);
       }
     }
@@ -1451,7 +1457,7 @@ ape_Object ape_nextarg(ape_State *A, ape_Object *args) {
 static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
                             int *argc) {
   int cnt = 0;
-  ape_defvar5(A, listp, envp, res, tail, va);
+  ape_defvar6(A, listp, envp, res, tail, va, vb);
 
   *listp = list;
   *envp = env;
@@ -1459,8 +1465,9 @@ static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
   *tail = *res;
 
   while (!isnil(*listp)) {
-    *va = ape_eval(A, ape_nextarg(A, listp), *envp);
-    cdr(*tail) = ape_cons(A, *va, nil);
+    *va = evalarg(listp, envp);
+    *vb = ape_cons(A, *va, nil);
+    cdr(*tail) = *vb;
     *tail = cdr(*tail);
     cnt += 1;
   }
@@ -1653,13 +1660,15 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
         for (; !isnil(*obj); *obj = cdr(*obj)) {
           /* (x . y) => (x y) */
           if (type(*obj) != APE_TPAIR) {
-            cdr(*tail) = ape_cons(A, *obj, nil);
+            *va = ape_cons(A, *obj, nil);
+            cdr(*tail) = *va;
             *tail = cdr(*tail);
             break;
           }
 
           /* copy list */
-          cdr(*tail) = ape_cons(A, car(*obj), nil);
+          *va = ape_cons(A, car(*obj), nil);
+          cdr(*tail) = *va;
           *tail = cdr(*tail);
         }
 
@@ -1678,7 +1687,8 @@ static ape_Object quasiquote(ape_State *A, ape_Object expr, ape_Object env) {
         *obj = quasiquote(A, *obj, *envp);
     }
 
-    cdr(*tail) = ape_cons(A, *obj, nil);
+    *va = ape_cons(A, *obj, nil);
+    cdr(*tail) = *va;
     *tail = cdr(*tail);
   }
   return cdr(*res);
@@ -1777,7 +1787,8 @@ EVAL:
       *vb = ape_cons(A, CTX(A)->primsyms[P_DO], *args);
       *res = create_object(A);
       settype(*res, prim(*fn) == P_FN ? APE_TFUNC : APE_TMACRO);
-      cdr(*res) = ape_cons(A, *va, *vb);
+      *vc = ape_cons(A, *va, *vb);
+      cdr(*res) = *vc;
       break;
     case P_EXPAND:
       *va = evalarg(args, envp);
