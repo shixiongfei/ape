@@ -33,15 +33,9 @@ static ape_Object nilp(ape_State *A, int argc, ape_Object args,
   return ape_bool(A, ape_isnil(A, ape_nextarg(A, &args)));
 }
 
-static ape_Object print(ape_State *A, int argc, ape_Object args,
+static ape_Object write(ape_State *A, int argc, ape_Object args,
                         ape_Object env) {
-  while (!ape_isnil(A, args)) {
-    ape_writefp(A, ape_nextarg(A, &args), stdout);
-
-    if (!ape_isnil(A, args))
-      printf(" ");
-  }
-  printf("\n");
+  ape_writefp(A, ape_nextarg(A, &args), stdout);
   return ape_nil(A);
 }
 
@@ -425,6 +419,14 @@ static const char cddddr[] = {"                                                \
 (defn cddddr (list)                                                            \
   (cdr (cdddr list)))"};
 
+static const char print[] = {"                                                 \
+(defn print xs                                                                 \
+  (if xs                                                                       \
+      (do (write (car xs))                                                     \
+          (when (cdr xs) (write \" \"))                                        \
+          (apply print (cdr xs)))                                              \
+    (write \"\n\")))"};
+
 static const char pairp[] = {"                                                 \
 (defn pair? (p)                                                                \
   (= (type p) 'pair))"};
@@ -561,6 +563,17 @@ static const char reduce[] = {"                                                \
     (set! accum (proc accum x)))                                               \
   accum)"};
 
+static const char range[] = {"                                                 \
+(defn range (from to step)                                                     \
+  (def cmp (if (> step 0) > <))                                                \
+  (defn iter (list accum)                                                      \
+    (if (cmp accum to)                                                         \
+        (reverse list)                                                         \
+      (iter (cons accum list) (+ accum step))))                                \
+  (if (= step 0)                                                               \
+      nil                                                                      \
+    (iter nil from)))"};
+
 static const char acons[] = {"                                                 \
 (defn acons (a b l)                                                            \
   (cons (cons a b) l))"};
@@ -645,7 +658,7 @@ void stdlib_open(ape_State *A) {
   const Function cfuncs[] = {
       {"error", error},
       {"nil?", nilp},
-      {"print", print},
+      {"write", write},
       {"eval", eval},
       {"load", load},
       {"number", number},
@@ -688,39 +701,23 @@ void stdlib_open(ape_State *A) {
       {NULL, NULL},
   };
   const char *stdlib[] = {
-      list,          defmacro,
-      defn,          caar,
-      cadr,          cdar,
-      cddr,          caaar,
-      caadr,         cadar,
-      caddr,         cdaar,
-      cdadr,         cddar,
-      cdddr,         caaaar,
-      caaadr,        caadar,
-      caaddr,        cadaar,
-      cadadr,        caddar,
-      cadddr,        cdaaar,
-      cdaadr,        cdadar,
-      cdaddr,        cddaar,
-      cddadr,        cdddar,
-      cddddr,        pairp,
-      numberp,       symbolp,
-      stringp,       vectorp,
-      fnp,           macrop,
-      primitivep,    cfnp,
-      ptrp,          length,
-      reverse,       let,
-      cond,          apply,
-      when,          unless,
-      while_,        for_,
-      append,        map,
-      filter,        reduce,
-      acons,         assoc,
-      get,           push,
-      pop,           list_ref,
-      string_tolist, string_tovector,
-      vector_tolist, list_tovector,
-      NULL,
+      list,          defmacro,      defn,          caar,
+      cadr,          cdar,          cddr,          caaar,
+      caadr,         cadar,         caddr,         cdaar,
+      cdadr,         cddar,         cdddr,         caaaar,
+      caaadr,        caadar,        caaddr,        cadaar,
+      cadadr,        caddar,        cadddr,        cdaaar,
+      cdaadr,        cdadar,        cdaddr,        cddaar,
+      cddadr,        cdddar,        cddddr,        print,
+      pairp,         numberp,       symbolp,       stringp,
+      vectorp,       fnp,           macrop,        primitivep,
+      cfnp,          ptrp,          length,        reverse,
+      let,           cond,          apply,         when,
+      unless,        while_,        for_,          append,
+      map,           filter,        reduce,        range,
+      acons,         assoc,         get,           push,
+      pop,           list_ref,      string_tolist, string_tovector,
+      vector_tolist, list_tovector, NULL,
   };
   ape_defvar2(A, va, vb);
 

@@ -207,3 +207,20 @@
 
 (print "nesting unquote-splicing =" `(,@,@'('(1 2 3)))
                                     `(,@,''(4 5 6)))
+
+
+(defn heart ()
+  (def rows (map (fn (row) (/ row 10))
+                 (range 15 -15 -1)))
+  (def cols (map (fn (col) (/ col 10))
+                 (range -15 15 0.5)))
+
+  (for y rows
+    (for x cols
+      (let (a (- (+ (* x x) (* y y)) 1.0))
+        (if (<= (- (* a a a) (* x x y y y)) 0.0)
+            (write "*")
+          (write "."))))
+    (print)))
+
+(heart)

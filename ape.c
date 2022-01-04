@@ -631,6 +631,9 @@ static void raise_error(ape_State *A, const char *errmsg) {
   /* reset context state */
   CTX(A)->calllist = nil;
 
+  /* flush stdout cache */
+  fflush(stdout);
+
   /* do error handler */
   if (CTX(A)->handlers.error)
     CTX(A)->handlers.error(A, errmsg, cl);
