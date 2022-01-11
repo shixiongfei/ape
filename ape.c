@@ -93,7 +93,7 @@ typedef uintptr_t uword_t;
 #endif
 #define NUMBUFSIZE ((int)sizeof(ape_Cell *) - EXPNBUFSIZE - 1)
 
-#define FLAGBITS 4
+#define MARKBITS 4
 #define FCMARKBIT (1 << 1) /* Full Chars */
 #define HASHMASK ((1 << 16) - 1)
 #define PTRTYPEMASK 0xFFFF
@@ -193,14 +193,14 @@ struct ape_Context {
 
 /*                    Tag
  * +----+----+----+----+----+----+----+----+
- * |        Type       | ?  | ?  |FLAG| 1  |
+ * |        Type       | ?  | ?  |mark| 1  |
  * +----+----+----+----+----+----+----+----+
  * 8    7    6    5    4    3    2    1    0
  */
 
 #define tag(x) ((x)->car.c)
-#define type(x) (tag(x) & 0x1 ? tag(x) >> FLAGBITS : APE_TPAIR)
-#define settype(x, t) (tag(x) = (t) << FLAGBITS | 1)
+#define type(x) (tag(x) & 0x1 ? tag(x) >> MARKBITS : APE_TPAIR)
+#define settype(x, t) (tag(x) = (t) << MARKBITS | 1)
 
 #define isnil(x) ((x) == nil)
 #define hash(x) ((x)->car.nx)
@@ -261,7 +261,7 @@ struct ape_Context {
 
 #define CTX(A) (A->ctx)
 
-static ape_Cell nilc = {{(ape_Cell *)(APE_TNIL << FLAGBITS | 1)}, {NULL}};
+static ape_Cell nilc = {{(ape_Cell *)(APE_TNIL << MARKBITS | 1)}, {NULL}};
 static ape_Cell *nil = &nilc;
 
 static void *alloc_emul(void *ud, void *ptr, size_t size) {
