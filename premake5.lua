@@ -1,6 +1,6 @@
 -- premake5.lua
 --
--- Copyright (c) 2021 Xiongfei Shi
+-- Copyright (c) 2021-2022 Xiongfei Shi
 --
 -- Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
 -- License: Apache-2.0
