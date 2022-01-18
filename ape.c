@@ -76,8 +76,9 @@ static const char *primnames[] = {
 };
 
 static const char *typenames[] = {
-    "pair",   "forward",  "nil",   "number",    "symbol",    "string",
-    "vector", "function", "macro", "primitive", "cfunction", "pointer",
+    "pair",      "forward",   "nil",     "number",   "symbol",
+    "string",    "vector",    "hashmap", "function", "macro",
+    "primitive", "cfunction", "pointer",
 };
 
 typedef intptr_t sword_t;
