@@ -23,11 +23,11 @@
 /* assumption: pointers are 32 or 64 bit,
    and float/double are IEEE binary32/binary64 */
 #if INTPTR_MAX >= INT64_MAX
-typedef double decimal_t;
-#define DEC_EPSILON DBL_EPSILON
+typedef double number_t;
+#define NUM_EPSILON DBL_EPSILON
 #else
-typedef float decimal_t;
-#define DEC_EPSILON FLT_EPSILON
+typedef float number_t;
+#define NUM_EPSILON FLT_EPSILON
 #endif
 
 enum {
@@ -103,19 +103,7 @@ typedef uintptr_t uword_t;
 typedef union {
   ape_Cell *o;
   ape_CFunc f;
-  decimal_t n; /* Alternatives before implementing Decimal */
-  uword_t d;   /* TODO: Decimal */
-  struct {
-#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    uword_t coefficient : NUMBUFSIZE * 8;
-    sword_t exponent : EXPNBUFSIZE * 8;
-    uword_t _ : 8;
-#else
-    uword_t _ : 8;
-    sword_t exponent : EXPNBUFSIZE * 8;
-    uword_t coefficient : NUMBUFSIZE * 8;
-#endif
-  };
+  number_t n;
   struct {
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     char s[STRBUFSIZE];
@@ -207,27 +195,6 @@ struct ape_Context {
 #define hash(x) ((x)->car.nx)
 #define ptrtype(x) ((x)->car.nx)
 #define veclen(x) ((x)->car.nx)
-
-/* TODO: Decimal(Base-10 Number): value = coefficient * 10^exponent
- *
- *                                64Bit Platform
- * +---------------------------------------------------------+-----------------+
- * |             tag                    16bit        40bit   |     64bit       |
- * | +------------+---+---+---+---+ +----------+-------------+---------------+ |
- * | |   Number   |...|...|0/1|...| | exponent | coefficient         d       | |
- * | +------------+---+---+---+---+ +----------+-------------+---------------+ |
- * |                      sign                               |                 |
- * +---------------------------------------------------------+-----------------+
- *
- *                                32Bit Platform
- * +---------------------------------------------------------+-----------------+
- * |             tag                    8bit         16bit   |     32bit       |
- * | +------------+---+---+---+---+ +----------+-------------+---------------+ |
- * | |   Number   |...|...|0/1|...| | exponent | coefficient         d       | |
- * | +------------+---+---+---+---+ +----------+-------------+---------------+ |
- * |                      sign                               |                 |
- * +---------------------------------------------------------+-----------------+
- */
 
 #define number(x) ((x)->cdr.n)
 #define prim(x) ((x)->cdr.c)
@@ -685,7 +652,7 @@ int ape_equal(ape_State *A, ape_Object a, ape_Object b) {
     return 0;
 
   if (type(a) == APE_TNUMBER)
-    return fabs(number(a) - number(b)) < DEC_EPSILON;
+    return fabs(number(a) - number(b)) < NUM_EPSILON;
 
   if (type(a) == APE_TSTRING) {
     for (; !isnil(a); a = cdr(a), b = cdr(b))
@@ -751,7 +718,7 @@ ape_Object ape_bool(ape_State *A, int b) {
 }
 
 ape_Object ape_integer(ape_State *A, long long n) {
-  return ape_number(A, (decimal_t)n);
+  return ape_number(A, (number_t)n);
 }
 
 ape_Object ape_number(ape_State *A, double n) {
@@ -759,7 +726,7 @@ ape_Object ape_number(ape_State *A, double n) {
 
   *obj = create_object(A);
   settype(*obj, APE_TNUMBER);
-  number(*obj) = (decimal_t)n;
+  number(*obj) = (number_t)n;
   return *obj;
 }
 
@@ -1085,7 +1052,7 @@ static ape_Cell rparen = {0};
 
 static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
   static const char *delimiter = "();";
-  decimal_t n;
+  number_t n;
   int ch;
   char buf[APE_SYMSIZE] = {0}, *p;
   ape_defvar4(A, v, res, tail, o);
@@ -1236,7 +1203,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
     CTX(A)->next_char = ch;
 
     /* try to read as number */
-    n = (decimal_t)strtod(buf, &p);
+    n = (number_t)strtod(buf, &p);
 
     if (p != buf && (strchr(delimiter, *p) || isspace(*p)))
       return ape_number(A, n);
@@ -1484,7 +1451,7 @@ static ape_Object eval_list(ape_State *A, ape_Object list, ape_Object env,
 }
 
 static ape_Object arith_add(ape_State *A, ape_Object args, ape_Object env) {
-  decimal_t res = 0;
+  number_t res = 0;
   ape_defvar2(A, argsp, envp);
 
   *argsp = args;
@@ -1497,7 +1464,7 @@ static ape_Object arith_add(ape_State *A, ape_Object args, ape_Object env) {
 }
 
 static ape_Object arith_sub(ape_State *A, ape_Object args, ape_Object env) {
-  decimal_t res;
+  number_t res;
   ape_defvar3(A, x, argsp, envp);
 
   *argsp = args;
@@ -1522,7 +1489,7 @@ static ape_Object arith_sub(ape_State *A, ape_Object args, ape_Object env) {
 }
 
 static ape_Object arith_mul(ape_State *A, ape_Object args, ape_Object env) {
-  decimal_t res = 1;
+  number_t res = 1;
   ape_defvar2(A, argsp, envp);
 
   *argsp = args;
@@ -1535,7 +1502,7 @@ static ape_Object arith_mul(ape_State *A, ape_Object args, ape_Object env) {
 }
 
 static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
-  decimal_t res;
+  number_t res;
   ape_defvar3(A, x, argsp, envp);
 
   *argsp = args;
@@ -1549,14 +1516,14 @@ static ape_Object arith_div(ape_State *A, ape_Object args, ape_Object env) {
   *x = ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER);
 
   if (isnil(*argsp))
-    res = (decimal_t)1;
+    res = (number_t)1;
   else {
     res = number(*x);
     *x = ape_checktype(A, evalarg(argsp, envp), APE_TNUMBER);
   }
 
   do {
-    if (fabs(number(*x) - (decimal_t)0) < DEC_EPSILON) {
+    if (fabs(number(*x) - (number_t)0) < NUM_EPSILON) {
       ape_error(A, "division by zero");
       return NULL;
     }
