@@ -87,13 +87,6 @@ typedef uintptr_t uword_t;
 #define STRBUFSIZE ((int)sizeof(ape_Cell *) - 1)
 #define STRBUFINDEX (STRBUFSIZE - 1)
 
-#if INTPTR_MAX >= INT64_MAX
-#define EXPNBUFSIZE 2
-#else
-#define EXPNBUFSIZE 1
-#endif
-#define NUMBUFSIZE ((int)sizeof(ape_Cell *) - EXPNBUFSIZE - 1)
-
 #define MARKBITS 4
 #define FCMARKBIT (1 << 1) /* Full Chars */
 #define HASHMASK ((1 << 16) - 1)
