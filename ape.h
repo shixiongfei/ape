@@ -1,7 +1,7 @@
 /*
  * ape.h
  *
- * Copyright (c) 2021-2022 Xiongfei Shi
+ * Copyright (c) 2021-2024 Xiongfei Shi
  *
  * Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
  * License: Apache-2.0
@@ -167,7 +167,6 @@ enum {
   APE_TSYMBOL,
   APE_TSTRING,
   APE_TVECTOR,
-  APE_THASHMAP,
   APE_TFUNC,
   APE_TMACRO,
   APE_TPRIM,
