@@ -1,6 +1,6 @@
 ;; test.ape
 ;;
-;; Copyright (c) 2021-2022 Xiongfei Shi
+;; Copyright (c) 2021-2024 Xiongfei Shi
 ;;
 ;; Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
 ;; License: Apache-2.0
@@ -207,6 +207,34 @@
 
 (print "nesting unquote-splicing =" `(,@,@'('(1 2 3)))
                                     `(,@,''(4 5 6)))
+
+
+(defn y-combinator (f)
+  ((fn (u)
+     (u u))
+   (fn (x)
+     (f (fn (args)
+          ((x x) args))))))
+
+(def y-fib
+  (y-combinator
+    (fn (fibonacci)
+      (fn (n)
+        (if (<= 2 n)
+            (+ (fibonacci (- n 1)) (fibonacci (- n 2)))
+          n)))))
+
+(print "y-fib 28 =" (y-fib 28))
+
+(def y-factorial
+  (y-combinator
+    (fn (factorial)
+      (fn (n)
+        (if (= n 0)
+            1
+          (* n (factorial (- n 1))))))))
+
+(print "y-factorial 10" (y-factorial 10))
 
 
 (defn heart ()
