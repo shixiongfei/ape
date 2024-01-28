@@ -213,8 +213,8 @@
   ((fn (u)
      (u u))
    (fn (x)
-     (f (fn (args)
-          ((x x) args))))))
+     (f (fn args
+          (apply (x x) args))))))
 
 (def y-fib
   (y-combinator
@@ -224,7 +224,7 @@
             (+ (fibonacci (- n 1)) (fibonacci (- n 2)))
           n)))))
 
-(print "y-fib 28 =" (y-fib 28))
+(print "y-fib 10 =" (y-fib 10))
 
 (def y-factorial
   (y-combinator
