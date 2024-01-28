@@ -234,7 +234,7 @@
             1
           (* n (factorial (- n 1))))))))
 
-(print "y-factorial 10" (y-factorial 10))
+(print "y-factorial 10 =" (y-factorial 10))
 
 
 (defn heart ()
