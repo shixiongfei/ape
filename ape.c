@@ -837,13 +837,8 @@ ape_Object ape_symbol(ape_State *A, const char *name) {
 ape_Object ape_vector(ape_State *A, int len) {
   ape_defvar2(A, obj, vec);
 
-  if (len < 1) {
-    ape_error(A, "vector length must greater than zero");
-    return NULL;
-  }
-
   *obj = create_object(A);
-  *vec = halloc(A, (len >> 1) + (len & 1));
+  *vec = len > 0 ? halloc(A, (len >> 1) + (len & 1)) : nil;
 
   settype(*obj, APE_TVECTOR);
   veclen(*obj) = len;
@@ -1112,6 +1107,9 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       ape_error(A, "stray '#'");
       return NULL;
     }
+
+    if (type(*v) == APE_TNIL)
+      return ape_cons(A, CTX(A)->primsyms[P_VECTOR], nil);
 
     /* Transform: #(...) => (vector ...) */
     return ape_cons(A, CTX(A)->primsyms[P_VECTOR],
