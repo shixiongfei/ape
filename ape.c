@@ -1108,6 +1108,7 @@ static ape_Object reader(ape_State *A, ape_ReadFunc fn, void *udata) {
       return NULL;
     }
 
+    /* Transform: #() => (vector) */
     if (type(*v) == APE_TNIL)
       return ape_cons(A, CTX(A)->primsyms[P_VECTOR], nil);
 
