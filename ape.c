@@ -351,7 +351,7 @@ static void copy_heap(ape_State *A) {
   }
 }
 
-static double collect_garbage(ape_State *A) {
+static int collect_garbage(ape_State *A) {
   GC *gc = &CTX(A)->gc;
   ape_Cell *swap;
 
@@ -365,8 +365,8 @@ static double collect_garbage(ape_State *A) {
 
   copy_heap(A);
 
-  /* calculate usage */
-  return (double)(gc->head - gc->from) / (double)gc->semi_size;
+  /* calculate free size */
+  return (int)(gc->semi_size - (uword_t)(gc->head - gc->from));
 }
 
 static void free_heap(ape_State *A, ape_Cell *heap, uword_t heap_size) {
@@ -426,10 +426,9 @@ static ape_Cell *halloc(ape_State *A, int n) {
   ape_Cell *cells;
 
   if (gc->head + n > gc->from + gc->semi_size) {
-    double usage = collect_garbage(A);
+    int free_size = collect_garbage(A);
 
-    /* Rescale the semi space when the usage rate reaches 75% */
-    if (usage > 0.75)
+    if (free_size < n)
       if (rescale_heap(A, n) < 0)
         if (gc->head + n > gc->from + gc->semi_size) {
           ape_error(A, "out of memory");

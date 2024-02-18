@@ -16,7 +16,7 @@
 
 #define APE_MAJOR 0
 #define APE_MINOR 3
-#define APE_PATCH 1
+#define APE_PATCH 2
 
 #define APE__STR(x) #x
 #define APE_STR(x) APE__STR(x)
