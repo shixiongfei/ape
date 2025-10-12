@@ -1,5 +1,6 @@
 *.make
 Makefile
+build/
 objs/
 bin/
 .vs/
@@ -7,3 +8,6 @@ bin/
 *.vcxproj
 *.filters
 *.user
+CMakeFiles/
+CMakeCache.txt
+*.cmake
