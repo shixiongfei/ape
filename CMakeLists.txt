@@ -1,3 +1,13 @@
+# CMakeLists.txt
+#
+# Copyright (c) 2021-2025 Xiongfei Shi
+#
+# Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
+# License: Apache-2.0
+#
+# https://github.com/shixiongfei/ape
+#
+
 cmake_minimum_required(VERSION 3.15)
 project(ape LANGUAGES C)
 
