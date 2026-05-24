@@ -1,7 +1,7 @@
 /*
  * ape_stdlib.c
  *
- * Copyright (c) 2021-2025 Xiongfei Shi
+ * Copyright (c) 2021-2026 Xiongfei Shi
  *
  * Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
  * License: Apache-2.0
@@ -594,11 +594,11 @@ static const char get[] = {"                                                   \
     (get (cddr list) key default)))"};
 
 static const char push[] = {"                                                  \
-(defmacro push (val place)                                                     \
+(defmacro push! (val place)                                                    \
   `(set! ,place (cons ,val ,place)))"};
 
 static const char pop[] = {"                                                   \
-(defmacro pop (place)                                                          \
+(defmacro pop! (place)                                                         \
   (let (gx (gensym))                                                           \
     `(let (,gx (car ,place))                                                   \
        (set! ,place (cdr ,place))                                              \

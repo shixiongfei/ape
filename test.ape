@@ -1,6 +1,6 @@
 ;; test.ape
 ;;
-;; Copyright (c) 2021-2025 Xiongfei Shi
+;; Copyright (c) 2021-2026 Xiongfei Shi
 ;;
 ;; Author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
 ;; License: Apache-2.0
@@ -113,13 +113,14 @@
 
 (def items (list "cat" "dog" "fox"))
 
-(push "owl" items)
-(push "cow" items)
-(push "wolf" items)
+(push! "owl" items)
+(push! "cow" items)
+(push! "wolf" items)
 
-(print (pop items))
 (print items)
-(print (expand '(push "bird" items)))
+(print (pop! items))
+(print items)
+(print (expand '(push! "bird" items)))
 
 
 (defn accum (n)
